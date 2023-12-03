@@ -1,4 +1,4 @@
-package metrics_handlers
+package metricshandlers
 
 import (
 	"fmt"
