@@ -4,16 +4,16 @@ import (
 	"context"
 	"fmt"
 	"github.com/ZnNr/go-musthave-metrics.git/internal/collector"
-	"github.com/ZnNr/go-musthave-metrics.git/internal/dataStorage"
+	"github.com/ZnNr/go-musthave-metrics.git/internal/storage"
 	"github.com/go-resty/resty/v2"
 	"golang.org/x/sync/errgroup"
 	"runtime"
 	"time"
 )
 
-// создает переменную m типа dataStorage.MemStorage и инициализирует поле Metrics как пустую мапу (map[string]dataStorage.Metric{}).
+// создает переменную m типа storage.MemStorage и инициализирует поле Metrics как пустую мапу (map[string]storage.Metric{}).
 // Таким образом, переменная m представляет собой хранилище метрик в памяти.
-var m = dataStorage.MemStorage{Metrics: map[string]dataStorage.Metric{}}
+var m = storage.MemStorage{Metrics: map[string]storage.Metric{}}
 
 func main() {
 	//Создается объект metricsCollector типа collector, принимающий указатель на переменную m в качестве аргумента. Этот объект отвечает за сбор метрик.

@@ -1,4 +1,4 @@
-package dataStorage
+package storage
 
 // Metric metric  структура, представляющая метрику.
 type Metric struct {
