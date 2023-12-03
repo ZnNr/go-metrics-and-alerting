@@ -67,10 +67,7 @@ func SaveMetric(w http.ResponseWriter, r *http.Request) {
 	//Записываем пустую строку в ответ (io.WriteString(w, "")),
 	//устанавливаем заголовки Content-Type и Content-Length для ответа,
 	//возвращаем код успешного выполнения (http.StatusOK)
-	writeString, err := io.WriteString(w, "")
-	if err != nil {
-		return
-	}
+	io.WriteString(w, "")
 	w.Header().Set("content-type", "text/plain; charset=utf-8")
 	w.Header().Set("content-lenght", strconv.Itoa(len(url[3])))
 	w.WriteHeader(http.StatusOK)
