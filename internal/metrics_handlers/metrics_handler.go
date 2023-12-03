@@ -1,6 +1,7 @@
-package serverhandlers
+package metrics_handlers
 
 import (
+	"fmt"
 	"io"
 	"net/http"
 	"strconv"
@@ -13,7 +14,7 @@ type metric struct {
 	mType string
 }
 
-// Определяем тип MemStorage как структуру с полем metrics типа map[string]metric, которое будет служить как коллекция для хранения метрик
+// Определяем тип MemStorage как структуру с полем metric типа map[string]metric, которое будет служить как коллекция для хранения метрик
 type MemStorage struct {
 	metrics map[string]metric
 }
@@ -28,7 +29,7 @@ func SaveMetric(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		return
 	}
-	//Если массив metrics пустой, инициализируем его с помощью make
+	//Если массив metric пустой, инициализируем его с помощью make
 	if len(m.metrics) == 0 {
 		m.metrics = make(map[string]metric, 0)
 	}
@@ -39,6 +40,12 @@ func SaveMetric(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNotFound)
 		return
 	}
+	// Проверка пути запроса
+	if url[1] != "update" {
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+
 	// В зависимости от второго компонента URL выбираем тип метрики (counter или gauge)
 	switch url[2] {
 	// Тип counter, int64 — новое значение должно добавляться к предыдущему, если какое-то значение уже было известно серверу.
@@ -71,4 +78,7 @@ func SaveMetric(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("content-type", "text/plain; charset=utf-8")
 	w.Header().Set("content-lenght", strconv.Itoa(len(url[3])))
 	w.WriteHeader(http.StatusOK)
+	// Выводим значения метрик и URL для отладки
+	fmt.Println(m.metrics)
+	fmt.Println(r.URL)
 }
