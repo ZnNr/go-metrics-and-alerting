@@ -2,25 +2,12 @@ package metricshandlers
 
 import (
 	"fmt"
+	"github.com/ZnNr/go-musthave-metrics.git/internal/storage"
 	"io"
 	"net/http"
 	"strconv"
 	"strings"
 )
-
-// Объявляем тип metric, который представляет метрику с полем value произвольного типа и полем mType типа string:
-type metric struct {
-	value any
-	mType string
-}
-
-// Определяем тип MemStorage как структуру с полем metric типа map[string]metric, которое будет служить как коллекция для хранения метрик
-type MemStorage struct {
-	metrics map[string]metric
-}
-
-// Создаем переменную m типа MemStorage
-var m MemStorage
 
 // SaveMetric Функция обрабатывает POST-запросы для сохранения метрик на сервере
 func SaveMetric(w http.ResponseWriter, r *http.Request) {
@@ -30,8 +17,8 @@ func SaveMetric(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	//Если массив metric пустой, инициализируем его с помощью make
-	if len(m.metrics) == 0 {
-		m.metrics = make(map[string]metric, 0)
+	if len(storage.MetricsStorage.Metrics) == 0 {
+		storage.MetricsStorage.Metrics = make(map[string]storage.Metric, 0)
 	}
 	// Разбиваем URL на компоненты, используя "/" в качестве разделителя
 	url := strings.Split(r.URL.String(), "/")
@@ -56,16 +43,19 @@ func SaveMetric(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
-		m.metrics[url[2]] = metric{value, url[2]}
+		if storage.MetricsStorage.Metrics[url[3]].Value != nil {
+			value += storage.MetricsStorage.Metrics[url[3]].Value.(int)
+		}
+		storage.MetricsStorage.Metrics[url[3]] = storage.Metric{Value: value, MetricType: url[2]}
 		// Тип gauge, float64 — новое значение должно замещать предыдущее
 	case "gauge":
 		//Для метрик типа gauge преобразуем строковое значение четвертого компонента URL в число с плавающей запятой (тип float64) с помощью strconv.ParseFloat()
-		value, err := strconv.ParseFloat(url[4], 64)
+		_, err := strconv.ParseFloat(url[4], 64)
 		if err != nil {
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
-		m.metrics[url[2]] = metric{value, url[2]}
+		storage.MetricsStorage.Metrics[url[3]] = storage.Metric{Value: url[4], MetricType: url[2]}
 	default:
 		//Если тип метрики неизвестен, возвращаем код ошибки 501 (http.StatusNotImplemented)
 		w.WriteHeader(http.StatusNotImplemented)
@@ -79,6 +69,66 @@ func SaveMetric(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("content-lenght", strconv.Itoa(len(url[3])))
 	w.WriteHeader(http.StatusOK)
 	// Выводим значения метрик и URL для отладки
-	fmt.Println(m.metrics)
-	fmt.Println(r.URL)
+	//fmt.Println(m.metrics)
+	//fmt.Println(r.URL)
+}
+
+// GetMetric - функция, обрабатывающая GET запрос для получения значения метрики.
+func GetMetric(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet { // Проверяем метод запроса, если это не GET, возвращаем ошибку "Метод не разрешен"
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+	url := strings.Split(r.URL.String(), "/") // Разделяем URL запроса по символу "/"
+	if len(url) != 4 {                        // Если количество полученных частей URL не равно 4, значит запрос некорректный. Возвращаем ошибку "Не найдено"
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+	if url[1] != "value" { // Если вторая часть URL не равна "value", значит запрос некорректный. Возвращаем ошибку "Не найдено"
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+	if _, ok := storage.MetricsStorage.Metrics[url[3]]; !ok { // Проверяем, есть ли метрика с указанным идентификатором. Если нет, возвращаем ошибку "Не найдено"
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+	value := storage.MetricsStorage.Metrics[url[3]].Value // Получаем значение метрики по указанному идентификатору
+
+	io.WriteString(w, "")                                       // Пишем пустую строку в ответ
+	w.Header().Set("content-type", "text/plain; charset=utf-8") // Устанавливаем заголовок "content-type" с типом "text/plain; charset=utf-8"
+	w.Header().Set("content-length", strconv.Itoa(len(url[3]))) // Устанавливаем заголовок "content-length" с длиной идентификатора метрики
+	w.WriteHeader(http.StatusOK)                                // Устанавливаем статус "200 OK"
+	// В зависимости от типа значения метрики записываем его в ответ с помощью функции WriteString
+	switch value.(type) {
+	case uint, uint64, int, int64: // Если тип значения является числовым типом, записываем его как строку
+		io.WriteString(w, strconv.Itoa(value.(int)))
+	default: // Если тип значения не числовой, записываем его как строку
+		io.WriteString(w, value.(string))
+
+	}
+}
+
+// ShowMetrics - функция, обрабатывающая GET запрос для отображения всех метрик.
+func ShowMetrics(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Path != "/" { // Проверяем путь URL запроса, если это не корневой путь, возвращаем ошибку "Не найдено"
+		http.Error(w, "404 not found.", http.StatusNotFound)
+		return
+	}
+	page := `
+<html> 
+   <head> 
+   </head> 
+   <body> 
+`
+	for n := range storage.MetricsStorage.Metrics {
+		// Перебираем все метрики из хранилища page
+		page += fmt.Sprintf(`<h3>%s   </h3>`, n) // Добавляем имя метрики в HTML-страницу
+	}
+	page += `
+   </body> 
+</html>
+`
+	w.Header().Set("content-type", "Content-Type: text/html; charset=utf-8") /// Устанавливаем заголовок "content-type" с типом "text/html; charset=utf-8"
+	w.WriteHeader(http.StatusOK)                                             // Устанавливаем статус "200 OK"
+	w.Write([]byte(page))                                                    //// Записываем HTML-страницу в ответ
 }
