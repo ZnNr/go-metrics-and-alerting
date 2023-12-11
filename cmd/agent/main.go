@@ -2,20 +2,53 @@ package main
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"github.com/ZnNr/go-musthave-metrics.git/internal/collector"
 	"github.com/ZnNr/go-musthave-metrics.git/internal/storage"
 	"github.com/go-resty/resty/v2"
 	"golang.org/x/sync/errgroup"
+	"os"
 	"runtime"
+	"strconv"
 	"time"
 )
 
 // создает переменную m типа storage.MemStorage и инициализирует поле Metrics как пустую мапу (map[string]storage.Metric{}).
 // Таким образом, переменная m представляет собой хранилище метрик в памяти.
-//var m = storage.MemStorage{Metrics: map[string]storage.Metric{}}
+// var m = storage.MemStorage{Metrics: map[string]storage.Metric{}}
+var (
+	flagRunAddr    string
+	reportInterval int
+	pollInterval   int
+)
+
+func parseFlags() {
+
+	flag.StringVar(&flagRunAddr, "a", "localhost:8080", "address and port to run server")
+	flag.IntVar(&reportInterval, "r", 10, "report interval")
+	flag.IntVar(&pollInterval, "p", 2, "poll interval")
+	flag.Parse()
+
+	if envRunAddr := os.Getenv("ADDRESS"); envRunAddr != "" {
+		flagRunAddr = envRunAddr
+	}
+	if envReportInterval := os.Getenv("REPORT_INTERVAL"); envReportInterval != "" {
+		reportIntervalEnv, err := strconv.Atoi(envReportInterval)
+		if err == nil {
+			reportInterval = reportIntervalEnv
+		}
+	}
+	if envPollInterval := os.Getenv("POLL_INTERVAL"); envPollInterval != "" {
+		pollIntervalEnv, err := strconv.Atoi(envPollInterval)
+		if err == nil {
+			pollInterval = pollIntervalEnv
+		}
+	}
+}
 
 func main() {
+	parseFlags()
 	//Создается объект metricsCollector типа collector, принимающий указатель на переменную storage.MetricsStorage в качестве аргумента.
 	//Этот объект отвечает за сбор метрик.
 	metricsCollector := collector.New(&storage.MetricsStorage)
@@ -38,7 +71,7 @@ func main() {
 	defer stick.Stop()
 	//Запускается вторая анонимная функция внутри группы ошибок, которая вызывает функцию Send() с использованием  объекта client. Если произойдет ошибка во время выполнения функции, она также будет обработана с помощью функции panic().
 	errs.Go(func() error {
-		if err := Send(client); err != nil {
+		if err := Send(client, reportInterval); err != nil {
 			panic(err)
 		}
 		return nil
@@ -66,7 +99,7 @@ func performCollect(metricsCollector IСollector) error {
 }
 
 // Функция Send() принимает аргументы client (клиент REST API)
-func Send(client *resty.Client) error {
+func Send(client *resty.Client, reportTimeout int) error {
 	//В бесконечном цикле for функцция ожидает событий от двух каналов
 	for {
 		// Перебираем все метрики в хранилище.
@@ -94,6 +127,6 @@ func Send(client *resty.Client) error {
 				}
 			}
 		}
-		time.Sleep(time.Second * 10) // Приостанавливаем выполнение функции на 10 секунд перед следующей итерацией цикла.
+		time.Sleep(time.Second * time.Duration(reportTimeout)) // Приостанавливаем выполнение функции на 10 секунд перед следующей итерацией цикла.
 	}
 }

@@ -1,4 +1,4 @@
-package metricshandlers
+package handlers
 
 import (
 	"fmt"
@@ -64,7 +64,10 @@ func SaveMetric(w http.ResponseWriter, r *http.Request) {
 	//Записываем пустую строку в ответ (io.WriteString(w, "")),
 	//устанавливаем заголовки Content-Type и Content-Length для ответа,
 	//возвращаем код успешного выполнения (http.StatusOK)
-	io.WriteString(w, "")
+	_, err := io.WriteString(w, "")
+	if err != nil {
+		return
+	}
 	w.Header().Set("content-type", "text/plain; charset=utf-8")
 	w.Header().Set("content-lenght", strconv.Itoa(len(url[3])))
 	w.WriteHeader(http.StatusOK)
@@ -94,16 +97,25 @@ func GetMetric(w http.ResponseWriter, r *http.Request) {
 	}
 	value := storage.MetricsStorage.Metrics[url[3]].Value // Получаем значение метрики по указанному идентификатору
 
-	io.WriteString(w, "")                                       // Пишем пустую строку в ответ
+	_, err := io.WriteString(w, "") // Пишем пустую строку в ответ
+	if err != nil {
+		return
+	}
 	w.Header().Set("content-type", "text/plain; charset=utf-8") // Устанавливаем заголовок "content-type" с типом "text/plain; charset=utf-8"
 	w.Header().Set("content-length", strconv.Itoa(len(url[3]))) // Устанавливаем заголовок "content-length" с длиной идентификатора метрики
 	w.WriteHeader(http.StatusOK)                                // Устанавливаем статус "200 OK"
 	// В зависимости от типа значения метрики записываем его в ответ с помощью функции WriteString
 	switch value.(type) {
 	case uint, uint64, int, int64: // Если тип значения является числовым типом, записываем его как строку
-		io.WriteString(w, strconv.Itoa(value.(int)))
+		_, err := io.WriteString(w, strconv.Itoa(value.(int)))
+		if err != nil {
+			return
+		}
 	default: // Если тип значения не числовой, записываем его как строку
-		io.WriteString(w, value.(string))
+		_, err := io.WriteString(w, value.(string))
+		if err != nil {
+			return
+		}
 
 	}
 }
@@ -130,5 +142,8 @@ func ShowMetrics(w http.ResponseWriter, r *http.Request) {
 `
 	w.Header().Set("content-type", "Content-Type: text/html; charset=utf-8") /// Устанавливаем заголовок "content-type" с типом "text/html; charset=utf-8"
 	w.WriteHeader(http.StatusOK)                                             // Устанавливаем статус "200 OK"
-	w.Write([]byte(page))                                                    //// Записываем HTML-страницу в ответ
+	_, err := w.Write([]byte(page))                                          // Записываем HTML-страницу в ответ
+	if err != nil {
+		return
+	} //
 }
