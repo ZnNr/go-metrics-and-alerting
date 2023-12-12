@@ -14,11 +14,11 @@ func main() {
 
 	// Определяем маршрут для POST запроса на обновление метрики.
 	//{name} имя метрики  {value} новое значение
-	r.Post("/update/{name}/{value}", handlers.SaveMetric)
+	r.Post("/update/{type}/{name}/{value}", handlers.SaveMetric)
 
 	// Определяем маршрут для GET запроса на получение значения метрики.
 	//{name} имя метрики
-	r.Get("/value/{name}", handlers.GetMetric)
+	r.Get("/value/{type}/{name}", handlers.GetMetric)
 
 	// Определяем маршрут для GET запроса на отображение всех метрик.
 	// Шаблон "/" обозначает корневой путь.

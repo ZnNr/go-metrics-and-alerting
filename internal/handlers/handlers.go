@@ -17,17 +17,17 @@ func SaveMetric(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		return
 	}
-	metricType := chi.URLParam(r, "type")
-	metricName := chi.URLParam(r, "name")
-	metricValue := chi.URLParam(r, "value")
+	metricType := chi.URLParam(r, "type")   // Получает значение параметра "type" из URL
+	metricName := chi.URLParam(r, "name")   // Получает значение параметра "name" из URL
+	metricValue := chi.URLParam(r, "value") // Получает значение параметра "value" из URL
 
 	err := collector.Collector.Collect(metricName, metricType, metricValue)
 	if errors.Is(err, collector.ErrBadRequest) {
-		w.WriteHeader(http.StatusBadRequest)
+		w.WriteHeader(http.StatusBadRequest) // Устанавливает код ответа 400 Bad Request
 		return
 	}
 	if errors.Is(err, collector.ErrNotImplemented) {
-		w.WriteHeader(http.StatusNotImplemented)
+		w.WriteHeader(http.StatusNotImplemented) // Устанавливает код ответа 501 Not Implemented
 		return
 	}
 
@@ -41,7 +41,7 @@ func SaveMetric(w http.ResponseWriter, r *http.Request) {
 
 // GetMetric Функция получения метрики
 func GetMetric(w http.ResponseWriter, r *http.Request) {
-	metricType := chi.URLParam(r, "type")
+	metricType := chi.URLParam(r, "type") // Получает значение параметра "type" из URL
 	metricName := chi.URLParam(r, "name")
 
 	value, err := collector.Collector.GetMetric(metricName, metricType)
