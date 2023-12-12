@@ -4,7 +4,7 @@ go 1.21.3
 
 require (
 	github.com/go-chi/chi/v5 v5.0.10
-	github.com/go-resty/resty/v2 v2.10.0
+	github.com/go-resty/resty/v2 v2.7.0
 	github.com/stretchr/testify v1.8.4
 	golang.org/x/sync v0.5.0
 )
