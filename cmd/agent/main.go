@@ -2,131 +2,70 @@ package main
 
 import (
 	"context"
-	"flag"
 	"fmt"
 	"github.com/ZnNr/go-musthave-metrics.git/internal/collector"
+	"github.com/ZnNr/go-musthave-metrics.git/internal/flags"
 	"github.com/ZnNr/go-musthave-metrics.git/internal/storage"
 	"github.com/go-resty/resty/v2"
 	"golang.org/x/sync/errgroup"
-	"os"
-	"runtime"
-	"strconv"
+	"log"
 	"time"
 )
 
-// создает переменную m типа storage.MemStorage и инициализирует поле Metrics как пустую мапу (map[string]storage.Metric{}).
-// Таким образом, переменная m представляет собой хранилище метрик в памяти.
-// var m = storage.MemStorage{Metrics: map[string]storage.Metric{}}
-var (
-	flagRunAddr    string
-	reportInterval int
-	pollInterval   int
-)
-
-func parseFlags() {
-
-	flag.StringVar(&flagRunAddr, "a", "localhost:8080", "address and port to run server")
-	flag.IntVar(&reportInterval, "r", 10, "report interval")
-	flag.IntVar(&pollInterval, "p", 2, "poll interval")
-	flag.Parse()
-
-	if envRunAddr := os.Getenv("ADDRESS"); envRunAddr != "" {
-		flagRunAddr = envRunAddr
-	}
-	if envReportInterval := os.Getenv("REPORT_INTERVAL"); envReportInterval != "" {
-		reportIntervalEnv, err := strconv.Atoi(envReportInterval)
-		if err == nil {
-			reportInterval = reportIntervalEnv
-		}
-	}
-	if envPollInterval := os.Getenv("POLL_INTERVAL"); envPollInterval != "" {
-		pollIntervalEnv, err := strconv.Atoi(envPollInterval)
-		if err == nil {
-			pollInterval = pollIntervalEnv
-		}
-	}
-}
-
 func main() {
-	parseFlags()
-	//Создается объект metricsCollector типа collector, принимающий указатель на переменную storage.MetricsStorage в качестве аргумента.
-	//Этот объект отвечает за сбор метрик.
-	metricsCollector := collector.New(&storage.MetricsStorage)
-	//Создается контекст ctx с помощью функции context.Background(). Контекст используется для управления жизненным циклом операций в приложении.
+	//Инициализируются параметры программы, используя пакет flags.
+	//Задаются интервалы опроса (poll interval) и отчетности (report interval), а также адрес удаленного сервера.
+	params := flags.Init(flags.WithPollInterval(), flags.WithReportInterval(), flags.WithAddr())
+	//Создается контекст для координации выполнения горутин
 	ctx := context.Background()
-	//Создается периодический таймер mtick с интервалом в 2 секунды. Этот таймер будет использоваться в функции performCollect() для регулярного сбора метрик.
-
+	//Создается группа ошибок, которая позволяет координировать работу нескольких горутин и обрабатывать ошибки, произошедшие внутри них.
 	errs, _ := errgroup.WithContext(ctx)
-	// Внутри группы ошибок запускается анонимная функция с использованием метода Go(). В этой функции вызывается функция performCollect(), которая принимает объект metricsCollector. Если во время выполнения функции произойдет ошибка, она будет обрабатываться с помощью функции panic().
 	errs.Go(func() error {
-		if err := performCollect(metricsCollector); err != nil {
-			panic(err)
+		agg := storage.New(&collector.Collector)
+		for { //// Цикл для периодического сохранения метрик
+			//Запускается горутина, которая периодически сохраняет метрики.
+			//В каждой итерации цикла вызывается функция Store() из пакета storage,
+			//чтобы сохранить текущие метрики.
+			//Затем горутина "спит" на определенное время, заданное в параметрах (poll interval).
+			agg.Store()
+			time.Sleep(time.Duration(params.PollInterval) * time.Second)
 		}
-		return nil
 	})
-	//Создается периодический таймер stick с интервалом в 10 секунд.
-	stick := time.NewTicker(time.Second * 10)
-	//Создается объект client типа resty.Client, который будет использоваться для отправки HTTP-запросов.
+	//Создается клиент resty для выполнения HTTP-запросов.
+	//Затем запускается горутина, которая периодически отправляет метрики на удаленный сервер.
+	//В функции send() отправляются POST-запросы счетчиков и метрик на удаленный адрес.
 	client := resty.New()
-	defer stick.Stop()
-	//Запускается вторая анонимная функция внутри группы ошибок, которая вызывает функцию Send() с использованием  объекта client. Если произойдет ошибка во время выполнения функции, она также будет обработана с помощью функции panic().
 	errs.Go(func() error {
-		if err := Send(client, reportInterval); err != nil {
-			panic(err)
+		if err := send(client, params.ReportInterval, params.FlagRunAddr); err != nil {
+			log.Fatalln(err)
 		}
 		return nil
 	})
-	//Вызывается метод Wait() для группы ошибок. Этот метод блокирует выполнение программы до тех пор, пока все операции не завершатся.
-	_ = errs.Wait()
+
+	_ = errs.Wait() //Ожидание завершения всех горутин и обработка ошибок, возникших внутри них.
 }
 
-// ICollector представляет собой интерфейс для сборщика метрик
-type IСollector interface {
-	CollectMetrics(metrics *runtime.MemStats)
-}
-
-// performCollect() - это функция, которая выполняет сбор метрик в регулярных интервалах с использованием контекста, таймера и объекта metricsCollector.
-// функция находится в постоянном цикле
-// - metricsCollector - объект, ответственный за сбор и хранение метрик.
-func performCollect(metricsCollector IСollector) error {
+// Функция send() отправляет метрики на удаленный сервер.
+// В бесконечном цикле происходит отправка POST-запросов для обновления значений счетчиков и метрик на удаленном адресе.
+// В каждой итерации цикла происходит обращение к пакету collector для получения текущих значений счетчиков и метрик.
+// Затем выполняется отправка POST-запросов с использованием клиента resty.
+// После отправки всех метрик горутина "спит" на определенное время, заданное в параметрах (report interval).
+func send(client *resty.Client, reportTimeout int, addr string) error {
 	for {
-		metrics := runtime.MemStats{}
-		runtime.ReadMemStats(&metrics)
-		metricsCollector.CollectMetrics(&metrics)
-		time.Sleep(time.Second * 2)
-
-	}
-}
-
-// Функция Send() принимает аргументы client (клиент REST API)
-func Send(client *resty.Client, reportTimeout int) error {
-	//В бесконечном цикле for функцция ожидает событий от двух каналов
-	for {
-		// Перебираем все метрики в хранилище.
-		for n, i := range storage.MetricsStorage.Metrics {
-			// Используем switch для определения типа значения метрики.
-			switch i.Value.(type) {
-			case uint, uint64, int, int64: // Если тип значения метрики является целочисленным, отправляем POST запрос на сервер.
-				// Используем resty.Client для создания HTTP запроса.
-				// Устанавливаем заголовок "Content-Type" со значением "text/plain".
-				// Используем strconv для преобразования значения метрики в строку и форматируем URL запроса с помощью fmt.Sprintf.
-				// Отправляем запрос на URL "http://localhost:8080/update/<тип_метрики>/<имя_метрики>/<значение_метрики>".
-				_, err := client.R().
-					SetHeader("Content-Type", "text/plain").
-					Post(fmt.Sprintf("http://localhost:8080/update/%s/%s/%d", i.MetricType, n, i.Value))
-				if err != nil {
-					return err // Если произошла ошибка при отправке запроса, возвращаем ошибку.
-				}
-			case float64: // Если тип значения метрики является вещественным числом, выполняем аналогичные действия для отправки запроса,
-				// но преобразуем значение метрики в строку с помощью формата "%f".
-				_, err := client.R().
-					SetHeader("Content-Type", "text/plain").
-					Post(fmt.Sprintf("http://localhost:8080/update/%s/%s/%f", i.MetricType, n, i.Value))
-				if err != nil {
-					return err // Если произошла ошибка при отправке запроса, возвращаем ошибку.
-				}
+		for n, v := range collector.Collector.GetCounters() {
+			if _, err := client.R().
+				SetHeader("Content-Type", "text/plain").
+				Post(fmt.Sprintf("http://%s/update/counter/%s/%s", addr, n, v)); err != nil {
+				return err
 			}
 		}
-		time.Sleep(time.Second * time.Duration(reportTimeout)) // Приостанавливаем выполнение функции на 10 секунд перед следующей итерацией цикла.
+		for n, v := range collector.Collector.GetGauges() {
+			if _, err := client.R().
+				SetHeader("Content-Type", "text/plain").
+				Post(fmt.Sprintf("http://%s/update/gauge/%s/%s", addr, n, v)); err != nil {
+				return err
+			}
+		}
+		time.Sleep(time.Duration(reportTimeout) * time.Second)
 	}
 }
