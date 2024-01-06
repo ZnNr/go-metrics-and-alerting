@@ -73,7 +73,7 @@ func sendRequest(req *resty.Request, addr string) error {
 	err := retry.Do(
 		func() error {
 			var err error
-			_, err = req.Post(fmt.Sprintf("https://%s/update/", addr))
+			_, err = req.Post(fmt.Sprintf("http://%s/update/", addr))
 			return err
 		},
 		retry.Attempts(10),
