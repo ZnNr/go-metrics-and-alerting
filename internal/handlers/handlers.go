@@ -25,11 +25,11 @@ func SaveMetric(w http.ResponseWriter, r *http.Request) {
 
 	err := collector.Collector.Collect(metricName, metricType, metricValue)
 	if errors.Is(err, collector.ErrBadRequest) {
-		w.WriteHeader(http.StatusBadRequest) // Устанавливает код ответа 400 Bad Request
+		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 	if errors.Is(err, collector.ErrNotImplemented) {
-		w.WriteHeader(http.StatusNotImplemented) // Устанавливает код ответа 501 Not Implemented
+		w.WriteHeader(http.StatusNotImplemented)
 		return
 	}
 
@@ -43,10 +43,10 @@ func SaveMetric(w http.ResponseWriter, r *http.Request) {
 
 // GetMetric Функция получения метрики
 func GetMetric(w http.ResponseWriter, r *http.Request) {
-	metricType := chi.URLParam(r, "type") // Получает значение параметра "type" из URL
+	metricType := chi.URLParam(r, "type")
 	metricName := chi.URLParam(r, "name")
 
-	value, err := collector.Collector.GetMetric(metricName, metricType)
+	value, err := collector.Collector.GetMetricByName(metricName, metricType)
 	if errors.Is(err, collector.ErrNotFound) {
 		w.WriteHeader(http.StatusNotFound)
 		return
@@ -95,6 +95,7 @@ func SaveMetricFromJSON(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
+
 	var metric Metrics
 	if err := json.Unmarshal(buf.Bytes(), &metric); err != nil {
 		w.WriteHeader(http.StatusBadRequest)
@@ -107,6 +108,7 @@ func SaveMetricFromJSON(w http.ResponseWriter, r *http.Request) {
 	case "gauge":
 		metricValue = fmt.Sprintf("%.11f", *metric.Value)
 	}
+
 	err := collector.Collector.Collect(metric.ID, metric.MType, metricValue)
 	if errors.Is(err, collector.ErrBadRequest) {
 		w.WriteHeader(http.StatusBadRequest)
@@ -116,11 +118,13 @@ func SaveMetricFromJSON(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNotImplemented)
 		return
 	}
-	updated, err := collector.Collector.GetMetric(metric.ID, metric.MType)
+
+	updated, err := collector.Collector.GetMetricByName(metric.ID, metric.MType)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+
 	result := Metrics{
 		ID:    metric.ID,
 		MType: metric.MType,
@@ -142,11 +146,13 @@ func SaveMetricFromJSON(w http.ResponseWriter, r *http.Request) {
 		}
 		result.Value = &g
 	}
+
 	resultJSON, err := json.Marshal(result)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+
 	w.Header().Set("content-type", "application/json")
 	if _, err = w.Write(resultJSON); err != nil {
 		return
@@ -161,12 +167,14 @@ func GetMetricFromJSON(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
+
 	var metric Metrics
 	if err := json.Unmarshal(buf.Bytes(), &metric); err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	value, err := collector.Collector.GetMetric(metric.ID, metric.MType)
+
+	value, err := collector.Collector.GetMetricByName(metric.ID, metric.MType)
 	if errors.Is(err, collector.ErrNotFound) {
 		w.WriteHeader(http.StatusNotFound)
 		return
@@ -175,7 +183,8 @@ func GetMetricFromJSON(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNotImplemented)
 		return
 	}
-	if _, err := io.WriteString(w, ""); err != nil {
+
+	if _, err = io.WriteString(w, ""); err != nil {
 		return
 	}
 	switch metric.MType {
