@@ -41,6 +41,7 @@ func (a *storage) Store() {
 	a.metricsCollector.Collect("Sys", "gauge", strconv.Itoa(int(metrics.Sys)))
 	a.metricsCollector.Collect("TotalAlloc", "gauge", strconv.Itoa(int(metrics.TotalAlloc)))
 	a.metricsCollector.Collect("RandomValue", "gauge", strconv.Itoa(rand.Int()))
+	a.metricsCollector.Collect("LastGC", "gauge", strconv.Itoa(int(metrics.LastGC)))
 
 	cnt, _ := collector.Collector.GetMetricByName("PollCount", "counter")
 	v, _ := strconv.Atoi(cnt)
