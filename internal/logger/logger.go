@@ -12,13 +12,13 @@ func RequestLogger(h http.Handler) http.Handler {
 	logFn := func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
 
-		responseData := &responseData{
+		rd := &responseData{
 			status: 0,
 			size:   0,
 		}
 		lw := loggingResponseWriter{
 			ResponseWriter: w, // встраиваем оригинальный http.ResponseWriter
-			responseData:   responseData,
+			responseData:   rd,
 		}
 		h.ServeHTTP(&lw, r)
 
@@ -26,27 +26,24 @@ func RequestLogger(h http.Handler) http.Handler {
 		SugarLogger.Infoln(
 			"uri", r.RequestURI,
 			"method", r.Method,
-			"status", responseData.status, // получаем перехваченный код статуса ответа
+			"status", rd.status, // получаем перехваченный код статуса ответа
 			"duration", duration,
-			"size", responseData.size, // получаем перехваченный размер ответа
+			"size", rd.size, // получаем перехваченный размер ответа
 		)
 	}
 	return http.HandlerFunc(logFn)
 }
 
-type (
-	// берём структуру для хранения сведений об ответе
-	responseData struct {
-		status int
-		size   int
-	}
+type responseData struct {
+	status int
+	size   int
+}
 
-	// добавляем реализацию http.ResponseWriter
-	loggingResponseWriter struct {
-		http.ResponseWriter // встраиваем оригинальный http.ResponseWriter
-		responseData        *responseData
-	}
-)
+// добавляем реализацию http.ResponseWriter
+type loggingResponseWriter struct {
+	http.ResponseWriter // встраиваем оригинальный http.ResponseWriter
+	responseData        *responseData
+}
 
 func (r *loggingResponseWriter) Write(b []byte) (int, error) {
 	// записываем ответ, используя оригинальный http.ResponseWriter
