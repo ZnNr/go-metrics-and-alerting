@@ -15,10 +15,11 @@ func main() {
 		panic(err)
 	}
 	defer logger.Sync()
+
 	log.SugarLogger = *logger.Sugar()
 
 	params := flags.Init(flags.WithAddr())
-	r := chi.NewRouter() // Создаем новый маршрутизатор с помощью chi.NewRouter()
+	r := chi.NewRouter()
 	r.Use(log.RequestLogger)
 	r.Post("/update/", handlers.SaveMetricFromJSON)
 	r.Post("/value/", handlers.GetMetricFromJSON)
@@ -34,5 +35,4 @@ func main() {
 		// записываем в лог ошибку, если сервер не запустился
 		log.SugarLogger.Fatalw(err.Error(), "event", "start server")
 	}
-
 }

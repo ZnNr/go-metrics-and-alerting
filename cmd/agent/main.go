@@ -51,7 +51,7 @@ func send(client *resty.Client, reportTimeout int, addr string) error {
 	for {
 		for n, v := range collector.Collector.GetCounters() {
 			req := client.R().
-				SetHeader("Content-Type", "text/plain").
+				SetHeader("Content-Type", "application/json").
 				SetBody(fmt.Sprintf(`{"id":%q, "type":"counter", "delta": %s}`, n, v))
 			if err := sendRequest(req, addr); err != nil {
 				return err
@@ -59,7 +59,7 @@ func send(client *resty.Client, reportTimeout int, addr string) error {
 		}
 		for n, v := range collector.Collector.GetGauges() {
 			req := client.R().
-				SetHeader("Content-Type", "text/plain").
+				SetHeader("Content-Type", "application/json").
 				SetBody(fmt.Sprintf(`{"id":%q, "type":"gauge", "value": %s}`, n, v))
 			if err := sendRequest(req, addr); err != nil {
 				return err
@@ -84,6 +84,6 @@ func sendRequest(req *resty.Request, addr string) error {
 	if err != nil {
 		return err
 	}
-
+	// do something with the response
 	return nil
 }
