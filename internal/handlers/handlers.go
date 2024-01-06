@@ -107,7 +107,7 @@ func SaveMetricFromJSON(w http.ResponseWriter, r *http.Request) {
 	case "gauge":
 		metricValue = fmt.Sprintf("%.11f", *metric.Value)
 	}
-	err := collector.Collector.Collect(metric.ID, metric.MType, metricValue
+	err := collector.Collector.Collect(metric.ID, metric.MType, metricValue)
 	if errors.Is(err, collector.ErrBadRequest) {
 		w.WriteHeader(http.StatusBadRequest)
 		return
