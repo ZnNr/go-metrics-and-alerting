@@ -150,6 +150,7 @@ func GetMetric(w http.ResponseWriter, r *http.Request) {
 }
 
 func ShowMetrics(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("content-type", "Content-Type: text/html; charset=utf-8")
 	if r.URL.Path != "/" {
 		http.Error(w, fmt.Sprintf("wrong path %q", r.URL.Path), http.StatusNotFound)
 		return
