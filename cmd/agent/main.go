@@ -18,7 +18,10 @@ import (
 func main() {
 	//Инициализируются параметры программы, используя пакет flags.
 	//Задаются интервалы опроса (poll interval) и отчетности (report interval), а также адрес удаленного сервера.
-	params := flags.Init(flags.WithPollInterval(), flags.WithReportInterval(), flags.WithAddr())
+	params := flags.Init(
+		flags.WithPollInterval(),
+		flags.WithReportInterval(),
+		flags.WithAddr())
 	//Создается контекст для координации выполнения горутин
 	ctx := context.Background()
 	//Создается группа ошибок, которая позволяет координировать работу нескольких горутин и обрабатывать ошибки, произошедшие внутри них.
@@ -54,6 +57,7 @@ func send(client *resty.Client, reportTimeout int, addr string) error {
 		SetHeader("Content-Type", "application/json").
 		SetHeader("Accept-Encoding", "gzip").
 		SetHeader("Content-Encoding", "gzip")
+
 	for {
 		for n, v := range collector.Collector.GetCounters() {
 			jsonInput := fmt.Sprintf(`{"id":%q, "type":"counter", "delta": %s}`, n, v)
@@ -80,11 +84,14 @@ func sendRequest(req *resty.Request, jsonInput string, addr string) error {
 	if err := zb.Close(); err != nil {
 		return fmt.Errorf("error while trying to close writer: %w", err)
 	}
+
 	err := retry.Do(
 		func() error {
 			var err error
-			_, err = req.Post(fmt.Sprintf("http://%s/update/", addr))
-			return err
+			if _, err = req.SetBody(buf).Post(fmt.Sprintf("http://%s/update/", addr)); err != nil {
+				return fmt.Errorf("error while trying to create post request: %w", err)
+			}
+			return nil
 		},
 		retry.Attempts(10),
 		retry.OnRetry(func(n uint, err error) {
