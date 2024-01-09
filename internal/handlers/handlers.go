@@ -22,6 +22,10 @@ func SaveMetric(w http.ResponseWriter, r *http.Request) {
 	metricName := chi.URLParam(r, "name")
 	metricValue := chi.URLParam(r, "value")
 
+	if metricName == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
 	err := collector.Collector.Collect(metricName, metricType, metricValue)
 	if errors.Is(err, collector.ErrBadRequest) {
 		w.WriteHeader(http.StatusBadRequest)
@@ -168,5 +172,4 @@ func ShowMetrics(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("content-type", "Content-Type: text/html; charset=utf-8")
-	w.WriteHeader(http.StatusOK)
 }
