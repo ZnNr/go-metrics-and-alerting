@@ -9,7 +9,7 @@ import (
 )
 
 // Store функуия используется для сбора метрик и сохранения их в хранилище.
-func (a *storage) Store() {
+func (a *Storage) Store() {
 	metrics := runtime.MemStats{}  //создается переменная metrics типа runtime.MemStats, которая представляет собой статистику памяти
 	runtime.ReadMemStats(&metrics) //вызывается функциякоторая заполняет структуру metrics актуальными данными о памяти.
 	//Происходит вызов метода Collect() объекта a.metricsCollector для каждого из собранных показателей памяти.
@@ -25,6 +25,7 @@ func (a *storage) Store() {
 	a.metricsCollector.Collect("HeapObjects", "gauge", strconv.FormatUint(metrics.HeapObjects, 10))
 	a.metricsCollector.Collect("HeapReleased", "gauge", strconv.FormatUint(metrics.HeapReleased, 10))
 	a.metricsCollector.Collect("HeapSys", "gauge", strconv.FormatUint(metrics.HeapSys, 10))
+	a.metricsCollector.Collect("LastGC", "gauge", strconv.Itoa(int(metrics.LastGC)))
 	a.metricsCollector.Collect("Lookups", "gauge", strconv.FormatUint(metrics.Lookups, 10))
 	a.metricsCollector.Collect("MCacheInuse", "gauge", strconv.FormatUint(metrics.MCacheInuse, 10))
 	a.metricsCollector.Collect("MCacheSys", "gauge", strconv.FormatUint(metrics.MCacheSys, 10))
@@ -41,7 +42,6 @@ func (a *storage) Store() {
 	a.metricsCollector.Collect("Sys", "gauge", strconv.Itoa(int(metrics.Sys)))
 	a.metricsCollector.Collect("TotalAlloc", "gauge", strconv.Itoa(int(metrics.TotalAlloc)))
 	a.metricsCollector.Collect("RandomValue", "gauge", strconv.Itoa(rand.Int()))
-	a.metricsCollector.Collect("LastGC", "gauge", strconv.Itoa(int(metrics.LastGC)))
 
 	cnt, _ := collector.Collector.GetMetricByName("PollCount", "counter")
 	v, _ := strconv.Atoi(cnt)
@@ -50,17 +50,16 @@ func (a *storage) Store() {
 
 // New - это конструктор, который создает и возвращает новый экземпляр структуры storage.
 // Он принимает аргумент metricsCollector, который должен быть реализацией интерфейса collectorImpl
-func New(metricsCollector collectorImpl) *storage {
-	return &storage{
+func New(metricsCollector collectorImpl) *Storage {
+	return &Storage{
 		metricsCollector: metricsCollector,
 	}
 }
 
-// В структуре storage определены два поля:
-//
+// Storage определены два поля:
 // metricsCollector - тип этого поля задан как collectorImpl, это поле будет использоваться для сбора и хранения метрик.
 // полю metricsCollector можно присвоить любое значение, которое соответствует интерфейсу collectorImpl.
-type storage struct {
+type Storage struct {
 	metricsCollector collectorImpl
 }
 

@@ -57,6 +57,10 @@ func SaveMetricFromJSON(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
+	if metric.ID == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
 
 	err := collector.Collector.CollectFromJSON(metric)
 	if errors.Is(err, collector.ErrBadRequest) {

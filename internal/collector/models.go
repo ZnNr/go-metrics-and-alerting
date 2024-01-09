@@ -16,6 +16,6 @@ type collector struct {
 // counters - это мапа, которая хранит значения счетчиков метрик.
 // gauges - это мапа, которая хранит значения показателей метрик.
 type memStorage struct {
-	counters map[string]int
-	gauges   map[string]string
+	Counters map[string]int
+	Gauges   map[string]string
 }

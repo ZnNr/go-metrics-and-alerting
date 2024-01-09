@@ -17,7 +17,6 @@ import (
 
 func main() {
 	//Инициализируются параметры программы, используя пакет flags.
-	//Задаются интервалы опроса (poll interval) и отчетности (report interval), а также адрес удаленного сервера.
 	params := flags.Init(
 		flags.WithPollInterval(),
 		flags.WithReportInterval(),
