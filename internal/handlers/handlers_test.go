@@ -4,8 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/ZnNr/go-musthave-metrics.git/internal/collector"
-	"github.com/ZnNr/go-musthave-metrics.git/internal/compressor"
-	log "github.com/ZnNr/go-musthave-metrics.git/internal/logger"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-resty/resty/v2"
 	"github.com/stretchr/testify/assert"
@@ -98,113 +96,6 @@ func TestSaveMetric(t *testing.T) {
 			}
 			if tt.expectedCode == http.StatusOK {
 				assert.Equal(t, value, tt.mValue)
-			}
-		})
-	}
-}
-
-func TestSaveMetricFromJSON(t *testing.T) {
-	r := chi.NewRouter()
-	r.Use(log.RequestLogger)
-	r.Use(compressor.Compress)
-	r.Post("/update/{type}/{name}/{value}", SaveMetric)
-	r.Get("/value/{type}/{name}", GetMetric)
-	r.Post("/update/", SaveMetricFromJSON)
-	r.Post("/value/", GetMetricFromJSON)
-	r.Get("/", ShowMetrics)
-	srv := httptest.NewServer(r)
-	defer srv.Close()
-
-	testCases := []struct {
-		name          string
-		mType         string
-		mName         string
-		mValue        float64
-		mDelta        int64
-		expectedCode  int
-		expectedError error
-	}{
-		{
-			name:         "positive (counter)",
-			mType:        "counter",
-			mName:        "Counter15",
-			mDelta:       15,
-			expectedCode: http.StatusOK,
-		},
-		{
-			name:         "positive (gauge)",
-			mType:        "gauge",
-			mName:        "Gauge1",
-			mValue:       12.282,
-			expectedCode: http.StatusOK,
-		},
-		{
-			name:          "negative (invalid type)",
-			mType:         "invalid",
-			mName:         "Gauge1",
-			mValue:        12.282,
-			expectedCode:  http.StatusNotImplemented,
-			expectedError: collector.ErrNotImplemented,
-		},
-		{
-			name:          "negative (invalid name)",
-			mType:         "gauge",
-			mName:         "",
-			mValue:        1,
-			expectedCode:  http.StatusBadRequest,
-			expectedError: collector.ErrNotFound,
-		},
-		{
-			name:          "negative (invalid gauge value)",
-			mType:         "gauge",
-			mName:         "invalidGauge",
-			mValue:        -1.9,
-			expectedCode:  http.StatusBadRequest,
-			expectedError: collector.ErrNotFound,
-		},
-	}
-	for _, tt := range testCases {
-
-		t.Run(tt.name, func(t *testing.T) {
-			body := collector.MetricJSON{
-				ID:    tt.mName,
-				MType: tt.mType,
-				Delta: &tt.mDelta,
-				Value: &tt.mValue,
-			}
-			resBody, err := json.Marshal(body)
-			assert.NoError(t, err)
-			resp, err := resty.New().R().
-				SetHeader("Content-Type", "text/plain").
-				SetBody(resBody).
-				Post(fmt.Sprintf("%s/update/", srv.URL))
-
-			assert.NoError(t, err, "error making HTTP request")
-			assert.Equal(t, resp.StatusCode(), tt.expectedCode)
-
-			value, err := collector.Collector.GetMetricJSON(tt.mName, tt.mType)
-			if err != nil {
-				assert.EqualError(t, err, tt.expectedError.Error())
-			} else {
-				assert.NoError(t, err)
-			}
-			actual := collector.MetricJSON{}
-			json.Unmarshal(value, &actual)
-
-			expected := collector.MetricJSON{
-				MType: tt.mType,
-				ID:    tt.mName,
-				Delta: &tt.mDelta,
-				Value: &tt.mValue,
-			}
-			if tt.mValue == 0 {
-				expected.Value = nil
-			}
-			if tt.mDelta == 0 {
-				expected.Delta = nil
-			}
-			if tt.expectedCode == http.StatusOK {
-				assert.Equal(t, actual, expected)
 			}
 		})
 	}

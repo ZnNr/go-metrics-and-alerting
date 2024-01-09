@@ -51,12 +51,6 @@ func (c *collector) Restore(filePath string) error {
 	if err != nil {
 		return err
 	}
-	defer func(file *os.File) {
-		err = file.Close()
-		if err != nil {
-			//
-		}
-	}(file)
 	scanner := bufio.NewScanner(file)
 	if !scanner.Scan() {
 		return err
