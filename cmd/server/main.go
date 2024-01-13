@@ -1,31 +1,67 @@
 package main
 
 import (
+	"github.com/ZnNr/go-musthave-metrics.git/internal/collector"
+	"github.com/ZnNr/go-musthave-metrics.git/internal/compressor"
 	"github.com/ZnNr/go-musthave-metrics.git/internal/flags"
 	"github.com/ZnNr/go-musthave-metrics.git/internal/handlers"
+	log "github.com/ZnNr/go-musthave-metrics.git/internal/logger"
 	"github.com/go-chi/chi/v5"
-	"log"
+	"go.uber.org/zap"
 	"net/http"
+	"time"
 )
 
 func main() {
-	params := flags.Init(flags.WithAddr())
-	r := chi.NewRouter() // Создаем новый маршрутизатор с помощью chi.NewRouter()
+	logger, err := zap.NewDevelopment() // добавляем предустановленный логер NewDevelopment
+	if err != nil {                     // вызываем панику, если ошибка
+		panic(err)
+	}
+	defer logger.Sync()
 
-	// Определяем маршрут для POST запроса на обновление метрики.
-	//{name} имя метрики  {value} новое значение
+	log.SugarLogger = *logger.Sugar()
+
+	params := flags.Init(
+		flags.WithAddr(),
+		flags.WithStoreInterval(),
+		flags.WithFileStoragePath(),
+		flags.WithRestore(),
+	)
+
+	r := chi.NewRouter()
+	r.Use(log.RequestLogger)
+	r.Use(compressor.Compress)
+	r.Post("/update/", handlers.SaveMetricFromJSON)
+	r.Post("/value/", handlers.GetMetricFromJSON)
 	r.Post("/update/{type}/{name}/{value}", handlers.SaveMetric)
-
-	// Определяем маршрут для GET запроса на получение значения метрики.
-	//{name} имя метрики
 	r.Get("/value/{type}/{name}", handlers.GetMetric)
-
-	// Определяем маршрут для GET запроса на отображение всех метрик.
-	// Шаблон "/" обозначает корневой путь.
 	r.Get("/", handlers.ShowMetrics)
+	log.SugarLogger.Infow(
+		"Starting server",
+		"addr", params.FlagRunAddr,
+	)
 
-	// Запускаем сервер на порту 8080 и передаем ему созданный маршрутизатор r.
-	//log.Fatal используется для логирования и завершения программы в случае возникновения критической ошибки.
-	log.Fatal(http.ListenAndServe(params.FlagRunAddr, r))
+	if params.Restore {
+		if err := collector.Collector.Restore(params.FileStoragePath); err != nil {
+			log.SugarLogger.Error(err.Error(), "restore error")
+		}
+	}
+	if params.FileStoragePath != "" {
+		go saveMetrics(params.FileStoragePath, params.StoreInterval)
+	}
 
+	if err := http.ListenAndServe(params.FlagRunAddr, r); err != nil {
+		// записываем в лог ошибку, если сервер не запустился
+		log.SugarLogger.Fatalw(err.Error(), "event", "start server")
+	}
+}
+func saveMetrics(path string, interval int) {
+	for {
+		if err := collector.Collector.Save(path); err != nil {
+			log.SugarLogger.Error(err.Error(), "save error")
+		} else {
+			log.SugarLogger.Info("successfully saved metrics")
+		}
+		time.Sleep(time.Duration(interval) * time.Second)
+	}
 }

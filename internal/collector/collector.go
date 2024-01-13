@@ -1,7 +1,11 @@
 package collector
 
 import (
+	"bufio"
+	"encoding/json"
 	"errors"
+	"fmt"
+	"os"
 	"strconv"
 )
 
@@ -17,8 +21,8 @@ var (
 // Collector Определен экземпляр структуры collector с именем Collector
 var Collector = collector{
 	storage: &memStorage{
-		counters: make(map[string]int),
-		gauges:   make(map[string]string),
+		Counters: make(map[string]int),
+		Gauges:   make(map[string]string),
 	},
 }
 
@@ -30,30 +34,122 @@ func (c *collector) Collect(metricName string, metricType string, metricValue st
 		if err != nil {
 			return ErrBadRequest
 		}
-		c.storage.counters[metricName] += value
+		c.storage.Counters[metricName] += value
 	case "gauge":
 		_, err := strconv.ParseFloat(metricValue, 64)
 		if err != nil {
 			return ErrBadRequest
 		}
-		c.storage.gauges[metricName] = metricValue
+		c.storage.Gauges[metricName] = metricValue
 	default:
 		return ErrNotImplemented
 	}
 	return nil
 }
+func (c *collector) Restore(filePath string) error {
+	file, err := os.OpenFile(filePath, os.O_RDONLY|os.O_CREATE, 0666)
+	if err != nil {
+		return err
+	}
+	scanner := bufio.NewScanner(file)
+	if !scanner.Scan() {
+		return err
+	}
+	data := scanner.Bytes()
+	metricsFromFile := memStorage{}
+	if err = json.Unmarshal(data, &metricsFromFile); err != nil {
+		return err
+	}
+	c.decode(metricsFromFile)
+	return nil
+}
 
-// GetMetric возвращает значение заданной метрики
-func (c *collector) GetMetric(metricName string, metricType string) (string, error) {
+func (c *collector) Save(filePath string) error {
+	var saveError error
+	file, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE, 0666)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if closeErr := file.Close(); closeErr != nil && saveError == nil {
+			saveError = closeErr
+		}
+	}()
+
+	writer := bufio.NewWriter(file)
+	metricsData := c.encode()
+	data, err := json.Marshal(&metricsData)
+	if err != nil {
+		return err
+	}
+	if _, err := writer.Write(data); err != nil {
+		return err
+	}
+	if err := writer.WriteByte('\n'); err != nil {
+		return err
+	}
+	if err := writer.Flush(); err != nil {
+		return err
+	}
+	return saveError
+}
+
+func (c *collector) CollectFromJSON(metric MetricJSON) error {
+	metricValue := ""
+	switch metric.MType {
+	case "counter":
+		metricValue = strconv.Itoa(int(*metric.Delta))
+	case "gauge":
+		metricValue = fmt.Sprintf("%.11f", *metric.Value)
+	}
+
+	return c.Collect(metric.ID, metric.MType, metricValue)
+}
+
+func (c *collector) GetMetricJSON(metricName, metricType string) ([]byte, error) {
+	updated, err := c.GetMetricByName(metricName, metricType)
+	if err != nil {
+		return nil, err
+	}
+
+	result := MetricJSON{
+		ID:    metricName,
+		MType: metricType,
+	}
+	switch result.MType {
+	case "counter":
+		counter, err := strconv.Atoi(updated)
+		if err != nil {
+			return nil, ErrBadRequest
+		}
+		c64 := int64(counter)
+		result.Delta = &c64
+	case "gauge":
+		g, err := strconv.ParseFloat(updated, 64)
+		if err != nil {
+			return nil, ErrBadRequest
+		}
+		result.Value = &g
+	}
+
+	resultJSON, err := json.Marshal(result)
+	if err != nil {
+		return nil, ErrBadRequest
+	}
+	return resultJSON, nil
+}
+
+// GetMetricByName возвращает значение заданной метрики по имени метрики
+func (c *collector) GetMetricByName(metricName string, metricType string) (string, error) {
 	switch metricType {
 	case "counter":
-		value, ok := Collector.storage.counters[metricName]
+		value, ok := Collector.storage.Counters[metricName]
 		if !ok {
 			return "", ErrNotFound
 		}
 		return strconv.Itoa(value), nil
 	case "gauge":
-		value, ok := Collector.storage.gauges[metricName]
+		value, ok := Collector.storage.Gauges[metricName]
 		if !ok {
 			return "", ErrNotFound
 		}
@@ -66,7 +162,7 @@ func (c *collector) GetMetric(metricName string, metricType string) (string, err
 // GetCounters возвращает все счетчики метрик
 func (c *collector) GetCounters() map[string]string {
 	counters := make(map[string]string, 0)
-	for name, value := range c.storage.counters {
+	for name, value := range c.storage.Counters {
 		counters[name] = strconv.Itoa(value)
 	}
 	return counters
@@ -75,7 +171,7 @@ func (c *collector) GetCounters() map[string]string {
 // GetGauges возвращает показатели метрик
 func (c *collector) GetGauges() map[string]string {
 	gauges := make(map[string]string, 0)
-	for name, value := range c.storage.gauges {
+	for name, value := range c.storage.Gauges {
 		gauges[name] = value
 	}
 	return gauges
@@ -85,24 +181,19 @@ func (c *collector) GetGauges() map[string]string {
 // Внутри метода перебираются элементы счетчиков и показателей в объекте "storage" и добавляются в срез.
 func (c *collector) GetAvailableMetrics() []string {
 	names := make([]string, 0)
-	for cm := range c.storage.counters {
+	for cm := range c.storage.Counters {
 		names = append(names, cm)
 	}
-	for gm := range c.storage.gauges {
+	for gm := range c.storage.Gauges {
 		names = append(names, gm)
 	}
 	return names
 }
 
-// collector представляет структуру коллектора метрик
-type collector struct {
-	storage *memStorage
+func (c *collector) encode() memStorage {
+	return *c.storage
 }
 
-// Структура memStorage представляет собой хранилище данных в памяти для коллектора метрик.
-// counters - это мапа, которая хранит значения счетчиков метрик.
-// gauges - это мапа, которая хранит значения показателей метрик.
-type memStorage struct {
-	counters map[string]int
-	gauges   map[string]string
+func (c *collector) decode(encoded memStorage) {
+	c.storage = &encoded
 }

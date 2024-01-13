@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/ZnNr/go-musthave-metrics.git/internal/collector"
 	"github.com/go-chi/chi/v5"
@@ -13,7 +14,13 @@ import (
 
 func TestSaveMetric(t *testing.T) {
 	r := chi.NewRouter()
+	//r.Use(log.RequestLogger)
+	//r.Use(compressor.Compress)
 	r.Post("/update/{type}/{name}/{value}", SaveMetric)
+	r.Get("/value/{type}/{name}", GetMetric)
+	r.Post("/update/", SaveMetricFromJSON)
+	r.Post("/value/", GetMetricFromJSON)
+	r.Get("/", ShowMetrics)
 	srv := httptest.NewServer(r)
 	defer srv.Close()
 
@@ -81,7 +88,7 @@ func TestSaveMetric(t *testing.T) {
 			assert.NoError(t, err, "error making HTTP request")
 			assert.Equal(t, resp.StatusCode(), tt.expectedCode)
 
-			value, err := collector.Collector.GetMetric(tt.mName, tt.mType)
+			value, err := collector.Collector.GetMetricByName(tt.mName, tt.mType)
 			if err != nil {
 				assert.EqualError(t, err, tt.expectedError.Error())
 			} else {
@@ -186,6 +193,95 @@ func TestGetMetric(t *testing.T) {
 			assert.NoError(t, err)
 			assert.Equal(t, resp.StatusCode(), tt.expectedCode)
 			assert.Equal(t, string(resp.Body()), tt.mValue)
+		})
+	}
+}
+
+func TestGetMetricFromJSON(t *testing.T) {
+	r := chi.NewRouter()
+	r.Post("/update/{type}/{name}/{value}", SaveMetric)
+	r.Post("/value/", GetMetricFromJSON)
+	srv := httptest.NewServer(r)
+	defer srv.Close()
+
+	client := resty.New()
+	_, _ = client.R().
+		SetHeader("Content-Type", "text/plain").
+		Post(fmt.Sprintf("%s/update/counter/Counter3/15", srv.URL))
+	_, _ = client.R().
+		SetHeader("Content-Type", "text/plain").
+		Post(fmt.Sprintf("%s/update/counter/Counter2/0", srv.URL))
+
+	_, _ = client.R().
+		SetHeader("Content-Type", "text/plain").
+		Post(fmt.Sprintf("%s/update/gauge/Gauge1/100500.2780001", srv.URL))
+	_, _ = client.R().
+		SetHeader("Content-Type", "text/plain").
+		Post(fmt.Sprintf("%s/update/gauge/Gauge2/100500.278000100", srv.URL))
+	_, _ = client.R().
+		SetHeader("Content-Type", "text/plain").
+		Post(fmt.Sprintf("%s/update/gauge/Gauge3/100500", srv.URL))
+
+	testCases := []struct {
+		name          string
+		mType         string
+		mName         string
+		mValue        float64
+		mDelta        int64
+		expectedCode  int
+		expectedError error
+	}{
+		{
+			name:         "case0",
+			mType:        "counter",
+			mName:        "Counter3",
+			mDelta:       15,
+			expectedCode: http.StatusOK,
+		},
+		{
+			name:         "case1",
+			mType:        "counter",
+			mName:        "Counter2",
+			mDelta:       0,
+			expectedCode: http.StatusOK,
+		},
+		{
+			name:         "case2",
+			mType:        "gauge",
+			mName:        "Gauge1",
+			mValue:       100500.2780001,
+			expectedCode: http.StatusOK,
+		},
+		{
+			name:         "case3",
+			mType:        "gauge",
+			mName:        "Gauge2",
+			mValue:       100500.278000100,
+			expectedCode: http.StatusOK,
+		},
+		{
+			name:         "case4",
+			mType:        "gauge",
+			mName:        "Gauge3",
+			mValue:       100500,
+			expectedCode: http.StatusOK,
+		},
+	}
+	for _, tt := range testCases {
+		t.Run(tt.name, func(t *testing.T) {
+			body := collector.MetricJSON{
+				ID:    tt.mName,
+				MType: tt.mType,
+			}
+			resBody, err := json.Marshal(body)
+			assert.NoError(t, err)
+
+			resp, err := resty.New().R().
+				SetBody(resBody).
+				Post(fmt.Sprintf("%s/value/", srv.URL))
+
+			assert.NoError(t, err)
+			assert.Equal(t, resp.StatusCode(), tt.expectedCode)
 		})
 	}
 }

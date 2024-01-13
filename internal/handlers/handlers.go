@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/ZnNr/go-musthave-metrics.git/internal/collector"
@@ -11,40 +13,74 @@ import (
 	"strconv"
 )
 
-// SaveMetric Функция сохранения метрики
 func SaveMetric(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		return
 	}
-	metricType := chi.URLParam(r, "type")   // Получает значение параметра "type" из URL
-	metricName := chi.URLParam(r, "name")   // Получает значение параметра "name" из URL
-	metricValue := chi.URLParam(r, "value") // Получает значение параметра "value" из URL
+	metricType := chi.URLParam(r, "type")
+	metricName := chi.URLParam(r, "name")
+	metricValue := chi.URLParam(r, "value")
 
+	if metricName == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
 	err := collector.Collector.Collect(metricName, metricType, metricValue)
 	if errors.Is(err, collector.ErrBadRequest) {
-		w.WriteHeader(http.StatusBadRequest) // Устанавливает код ответа 400 Bad Request
+		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 	if errors.Is(err, collector.ErrNotImplemented) {
-		w.WriteHeader(http.StatusNotImplemented) // Устанавливает код ответа 501 Not Implemented
+		w.WriteHeader(http.StatusNotImplemented)
 		return
 	}
 
+	w.WriteHeader(http.StatusOK)
 	if _, err = io.WriteString(w, ""); err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 	w.Header().Set("content-type", "text/plain; charset=utf-8")
 	w.Header().Set("content-length", strconv.Itoa(len(metricName)))
-	w.WriteHeader(http.StatusOK)
 }
 
-// GetMetric Функция получения метрики
-func GetMetric(w http.ResponseWriter, r *http.Request) {
-	metricType := chi.URLParam(r, "type") // Получает значение параметра "type" из URL
-	metricName := chi.URLParam(r, "name")
+func SaveMetricFromJSON(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+	var buf bytes.Buffer
+	if _, err := buf.ReadFrom(r.Body); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
 
-	value, err := collector.Collector.GetMetric(metricName, metricType)
+	var metric collector.MetricJSON
+	if err := json.Unmarshal(buf.Bytes(), &metric); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	if metric.ID == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	err := collector.Collector.CollectFromJSON(metric)
+	if errors.Is(err, collector.ErrBadRequest) {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	if errors.Is(err, collector.ErrNotImplemented) {
+		w.WriteHeader(http.StatusNotImplemented)
+		return
+	}
+
+	resultJSON, err := collector.Collector.GetMetricJSON(metric.ID, metric.MType)
+	if errors.Is(err, collector.ErrBadRequest) {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
 	if errors.Is(err, collector.ErrNotFound) {
 		w.WriteHeader(http.StatusNotFound)
 		return
@@ -54,19 +90,75 @@ func GetMetric(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if _, err = io.WriteString(w, ""); err != nil {
+	if _, err = w.Write(resultJSON); err != nil {
+		return
+	}
+	w.Header().Set("content-length", strconv.Itoa(len(metric.ID)))
+	w.Header().Set("content-type", "application/json")
+	w.WriteHeader(http.StatusOK)
+}
+
+func GetMetricFromJSON(w http.ResponseWriter, r *http.Request) {
+	var buf bytes.Buffer
+	if _, err := buf.ReadFrom(r.Body); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	var metric collector.MetricJSON
+	if err := json.Unmarshal(buf.Bytes(), &metric); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	resultJSON, err := collector.Collector.GetMetricJSON(metric.ID, metric.MType)
+	if errors.Is(err, collector.ErrBadRequest) {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	if errors.Is(err, collector.ErrNotFound) {
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+	if errors.Is(err, collector.ErrNotImplemented) {
+		w.WriteHeader(http.StatusNotImplemented)
+		return
+	}
+
+	w.Header().Set("content-type", "application/json")
+	if _, err = w.Write(resultJSON); err != nil {
+		return
+	}
+	w.Header().Set("content-length", strconv.Itoa(len(metric.ID)))
+	w.Header().Set("content-type", "application/json")
+	w.WriteHeader(http.StatusOK)
+}
+
+func GetMetric(w http.ResponseWriter, r *http.Request) {
+	metricType := chi.URLParam(r, "type")
+	metricName := chi.URLParam(r, "name")
+
+	value, err := collector.Collector.GetMetricByName(metricName, metricType)
+	if errors.Is(err, collector.ErrNotFound) {
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+	if errors.Is(err, collector.ErrNotImplemented) {
+		w.WriteHeader(http.StatusNotImplemented)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	if _, err = io.WriteString(w, value); err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 	w.Header().Set("content-type", "text/plain; charset=utf-8")
 	w.Header().Set("content-length", strconv.Itoa(len(value)))
-	w.WriteHeader(http.StatusOK)
-	if _, err = io.WriteString(w, value); err != nil {
-		return
-	}
 }
 
-// ShowMetrics Функция отображения всех метрик
 func ShowMetrics(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("content-type", "Content-Type: text/html; charset=utf-8")
 	if r.URL.Path != "/" {
 		http.Error(w, fmt.Sprintf("wrong path %q", r.URL.Path), http.StatusNotFound)
 		return
@@ -80,5 +172,4 @@ func ShowMetrics(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("content-type", "Content-Type: text/html; charset=utf-8")
-	w.WriteHeader(http.StatusOK)
 }

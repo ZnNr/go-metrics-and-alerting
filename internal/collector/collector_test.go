@@ -17,27 +17,27 @@ func TestCollector_Collect(t *testing.T) {
 	}{
 		{
 			name:        "case0",
-			storage:     collector{storage: &memStorage{gauges: map[string]string{}, counters: map[string]int{}}},
+			storage:     collector{storage: &memStorage{Gauges: map[string]string{}, Counters: map[string]int{}}},
 			metricName:  "Alloc",
 			metricType:  "gauge",
 			metricValue: "1",
 			expected: memStorage{
-				gauges: map[string]string{
+				Gauges: map[string]string{
 					"Alloc": "1",
 				},
 			},
 		},
 		{
 			name: "case1",
-			storage: collector{storage: &memStorage{gauges: map[string]string{
+			storage: collector{storage: &memStorage{Gauges: map[string]string{
 				"Alloc":         "3",
 				"GCCPUFraction": "5.543",
-			}, counters: map[string]int{}}},
+			}, Counters: map[string]int{}}},
 			metricName:  "Alloc",
 			metricType:  "gauge",
 			metricValue: "1",
 			expected: memStorage{
-				gauges: map[string]string{
+				Gauges: map[string]string{
 					"Alloc":         "1",
 					"GCCPUFraction": "5.543",
 				},
@@ -45,59 +45,59 @@ func TestCollector_Collect(t *testing.T) {
 		},
 		{
 			name: "case3",
-			storage: collector{storage: &memStorage{gauges: map[string]string{
+			storage: collector{storage: &memStorage{Gauges: map[string]string{
 				"Alloc": "3",
 				"Sys":   "5",
-			}, counters: map[string]int{
+			}, Counters: map[string]int{
 				"Counter": 5,
 			}}},
 			metricName:  "Counter",
 			metricType:  "counter",
 			metricValue: "10",
 			expected: memStorage{
-				gauges: map[string]string{
+				Gauges: map[string]string{
 					"Alloc": "3",
 					"Sys":   "5",
 				},
-				counters: map[string]int{
+				Counters: map[string]int{
 					"Counter": 15,
 				},
 			},
 		},
 		{
 			name: "case4",
-			storage: collector{storage: &memStorage{gauges: map[string]string{
+			storage: collector{storage: &memStorage{Gauges: map[string]string{
 				"Alloc": "3",
 				"Sys":   "5",
-			}, counters: map[string]int{}}},
+			}, Counters: map[string]int{}}},
 			metricName:  "Counter",
 			metricType:  "counter",
 			metricValue: "10",
 			expected: memStorage{
-				gauges: map[string]string{
+				Gauges: map[string]string{
 					"Alloc": "3",
 					"Sys":   "5",
 				},
-				counters: map[string]int{
+				Counters: map[string]int{
 					"Counter": 10,
 				},
 			},
 		},
 		{
 			name:        "case5",
-			storage:     collector{storage: &memStorage{gauges: map[string]string{}, counters: map[string]int{}}},
+			storage:     collector{storage: &memStorage{Gauges: map[string]string{}, Counters: map[string]int{}}},
 			metricName:  "Alloc",
 			metricType:  "gauge",
 			metricValue: "1.0000000",
 			expected: memStorage{
-				gauges: map[string]string{
+				Gauges: map[string]string{
 					"Alloc": "1.0000000",
 				},
 			},
 		},
 		{
 			name:        "case5",
-			storage:     collector{storage: &memStorage{gauges: map[string]string{}, counters: map[string]int{}}},
+			storage:     collector{storage: &memStorage{Gauges: map[string]string{}, Counters: map[string]int{}}},
 			metricName:  "Alloc",
 			metricType:  "gauge",
 			metricValue: "invalid",
@@ -109,7 +109,7 @@ func TestCollector_Collect(t *testing.T) {
 		},
 		{
 			name:        "case5",
-			storage:     collector{storage: &memStorage{gauges: map[string]string{}, counters: map[string]int{}}},
+			storage:     collector{storage: &memStorage{Gauges: map[string]string{}, Counters: map[string]int{}}},
 			metricName:  "Alloc",
 			metricType:  "invalid",
 			metricValue: "15",
@@ -121,7 +121,7 @@ func TestCollector_Collect(t *testing.T) {
 		},
 		{
 			name:        "case5",
-			storage:     collector{storage: &memStorage{gauges: map[string]string{}, counters: map[string]int{}}},
+			storage:     collector{storage: &memStorage{Gauges: map[string]string{}, Counters: map[string]int{}}},
 			metricName:  "Alloc",
 			metricType:  "counter",
 			metricValue: "17.001",
@@ -140,7 +140,7 @@ func TestCollector_Collect(t *testing.T) {
 			} else {
 				assert.EqualError(t, err, tt.expectedError.Error())
 			}
-			assert.Equal(t, tt.expected.gauges, tt.storage.GetGauges())
+			assert.Equal(t, tt.expected.Gauges, tt.storage.GetGauges())
 		})
 	}
 }
@@ -190,16 +190,23 @@ func TestCollector_GetMetric(t *testing.T) {
 			expectedError: ErrNotFound,
 		},
 		{
-			name:          "case4",
+			name:          "case5",
 			metricType:    "invalid",
 			metricName:    "Gauge2",
 			expectedValue: "",
 			expectedError: ErrNotImplemented,
 		},
+		{
+			name:          "case6",
+			metricType:    "counter",
+			metricName:    "Counter3",
+			expectedValue: "",
+			expectedError: ErrNotFound,
+		},
 	}
 	for _, tt := range testCases {
 		t.Run(tt.name, func(t *testing.T) {
-			value, err := Collector.GetMetric(tt.metricName, tt.metricType)
+			value, err := Collector.GetMetricByName(tt.metricName, tt.metricType)
 			if tt.expectedError == nil {
 				assert.NoError(t, err)
 			} else {
@@ -208,4 +215,163 @@ func TestCollector_GetMetric(t *testing.T) {
 			assert.Equal(t, value, tt.expectedValue)
 		})
 	}
+}
+
+func TestCollector_CollectFromJSON(t *testing.T) {
+	testCases := []struct {
+		name          string
+		metric        MetricJSON
+		expectedError string
+	}{
+		{
+			name: "positive (collect counter)",
+			metric: MetricJSON{
+				ID:    "metricValidName",
+				MType: "counter",
+				Delta: ptrInt(5),
+			},
+		},
+		{
+			name: "positive (collect gauge)",
+			metric: MetricJSON{
+				ID:    "metricValidName",
+				MType: "gauge",
+				Value: ptrFloat(5.727),
+			},
+		},
+		{
+			name: "negative (invalid metric type)",
+			metric: MetricJSON{
+				ID:    "metricValidName",
+				MType: "invalid metric type",
+				Value: ptrFloat(5.727),
+			},
+			expectedError: "not implemented",
+		},
+	}
+	for _, tt := range testCases {
+		t.Run(tt.name, func(t *testing.T) {
+			testCollector := collector{
+				storage: &memStorage{
+					Counters: make(map[string]int),
+					Gauges:   make(map[string]string),
+				},
+			}
+			err := testCollector.CollectFromJSON(tt.metric)
+			if tt.expectedError != "" {
+				assert.EqualError(t, err, tt.expectedError)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestCollector_GetAvailableMetrics(t *testing.T) {
+	testCases := []struct {
+		name             string
+		metricsCollector collector
+		expectedMetrics  []string
+	}{
+		{
+			name: "case0",
+			metricsCollector: collector{
+				storage: &memStorage{
+					Counters: map[string]int{
+						"firstCounter":  1,
+						"secondCounter": 2,
+					},
+					Gauges: map[string]string{
+						"firstGauge":  "1.35",
+						"secondGauge": "2.67",
+					},
+				},
+			},
+			expectedMetrics: []string{"firstCounter", "secondCounter", "firstGauge", "secondGauge"},
+		},
+		{
+			name: "case1",
+			metricsCollector: collector{
+				storage: &memStorage{
+					Counters: map[string]int{},
+					Gauges: map[string]string{
+						"firstGauge":  "1.35",
+						"secondGauge": "2.67",
+					},
+				},
+			},
+			expectedMetrics: []string{"firstGauge", "secondGauge"},
+		},
+		{
+			name: "case2",
+			metricsCollector: collector{
+				storage: &memStorage{
+					Counters: map[string]int{
+						"firstCounter":  1,
+						"secondCounter": 2,
+					},
+					Gauges: map[string]string{},
+				},
+			},
+			expectedMetrics: []string{"firstCounter", "secondCounter"},
+		},
+		{
+			name: "case3",
+			metricsCollector: collector{
+				storage: &memStorage{
+					Counters: map[string]int{},
+					Gauges:   map[string]string{},
+				},
+			},
+			expectedMetrics: []string{},
+		},
+	}
+	for _, tt := range testCases {
+		t.Run(tt.name, func(t *testing.T) {
+			actualMetrics := tt.metricsCollector.GetAvailableMetrics()
+			assert.ElementsMatch(t, actualMetrics, tt.expectedMetrics)
+		})
+	}
+}
+
+func TestCollector_GetCounters(t *testing.T) {
+	testCases := []struct {
+		name             string
+		metricsCollector collector
+		expectedCounters map[string]string
+	}{
+		{
+			name: "case0",
+			metricsCollector: collector{
+				storage: &memStorage{
+					Counters: map[string]int{
+						"firstCounter":  1,
+						"secondCounter": 2,
+					},
+					Gauges: map[string]string{
+						"firstGauge":  "1.35",
+						"secondGauge": "2.67",
+					},
+				},
+			},
+			expectedCounters: map[string]string{
+				"firstCounter":  "1",
+				"secondCounter": "2",
+			},
+		},
+	}
+	for _, tt := range testCases {
+		t.Run(tt.name, func(t *testing.T) {
+			actualMetrics := tt.metricsCollector.GetCounters()
+			assert.Equal(t, actualMetrics, tt.expectedCounters)
+		})
+	}
+}
+
+func ptrInt(variable int64) *int64 {
+	return &variable
+}
+
+func ptrFloat(variable float64) *float64 {
+	return &variable
 }
