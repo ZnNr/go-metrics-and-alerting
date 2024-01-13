@@ -71,8 +71,8 @@ func (c *collector) Save(filePath string) error {
 		return err
 	}
 	defer func() {
-		if err := file.Close(); err != nil {
-			saveError = err
+		if closeErr := file.Close(); closeErr != nil && saveError == nil {
+			saveError = closeErr
 		}
 	}()
 
@@ -106,7 +106,7 @@ func (c *collector) CollectFromJSON(metric MetricJSON) error {
 	return c.Collect(metric.ID, metric.MType, metricValue)
 }
 
-func (c *collector) GetMetricJSON(metricName string, metricType string) ([]byte, error) {
+func (c *collector) GetMetricJSON(metricName, metricType string) ([]byte, error) {
 	updated, err := c.GetMetricByName(metricName, metricType)
 	if err != nil {
 		return nil, err
