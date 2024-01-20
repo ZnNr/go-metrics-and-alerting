@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
+	"encoding/json"
 	"fmt"
 	"github.com/ZnNr/go-musthave-metrics.git/internal/collector"
 	"github.com/ZnNr/go-musthave-metrics.git/internal/flags"
@@ -21,24 +22,18 @@ func main() {
 		flags.WithPollInterval(),
 		flags.WithReportInterval(),
 		flags.WithAddr())
-	//Создается контекст для координации выполнения горутин
+
 	ctx := context.Background()
-	//Создается группа ошибок, которая позволяет координировать работу нескольких горутин и обрабатывать ошибки, произошедшие внутри них.
+
 	errs, _ := errgroup.WithContext(ctx)
 	errs.Go(func() error {
-		agg := storage.New(&collector.Collector)
-		for { //// Цикл для периодического сохранения метрик
-			//Запускается горутина, которая периодически сохраняет метрики.
-			//В каждой итерации цикла вызывается функция Store() из пакета storage,
-			//чтобы сохранить текущие метрики.
-			//Затем горутина "спит" на определенное время, заданное в параметрах (poll interval).
-			agg.Store()
+		st := storage.New(&collector.Collector)
+		for {
+			st.Store()
 			time.Sleep(time.Duration(params.PollInterval) * time.Second)
 		}
 	})
-	//Создается клиент resty для выполнения HTTP-запросов.
-	//Затем запускается горутина, которая периодически отправляет метрики на удаленный сервер.
-	//В функции send() отправляются POST-запросы счетчиков и метрик на удаленный адрес.
+
 	client := resty.New()
 	errs.Go(func() error {
 		if err := send(client, params.ReportInterval, params.FlagRunAddr); err != nil {
@@ -47,7 +42,7 @@ func main() {
 		return nil
 	})
 
-	_ = errs.Wait() //Ожидание завершения всех горутин и обработка ошибок, возникших внутри них.
+	_ = errs.Wait()
 }
 
 // Функция send() отправляет метрики на удаленный сервер.
@@ -58,16 +53,10 @@ func send(client *resty.Client, reportTimeout int, addr string) error {
 		SetHeader("Content-Encoding", "gzip")
 
 	for {
-		for n, v := range collector.Collector.GetCounters() {
-			jsonInput := fmt.Sprintf(`{"id":%q, "type":"counter", "delta": %s}`, n, v)
-			if err := sendRequest(req, jsonInput, addr); err != nil {
+		for _, v := range collector.Collector.Metrics {
+			jsonInput, _ := json.Marshal(v)
+			if err := sendRequest(req, string(jsonInput), addr); err != nil {
 				return fmt.Errorf("error while sending agent request for counter metric: %w", err)
-			}
-		}
-		for n, v := range collector.Collector.GetGauges() {
-			jsonInput := fmt.Sprintf(`{"id":%q, "type":"gauge", "value": %s}`, n, v)
-			if err := sendRequest(req, jsonInput, addr); err != nil {
-				return fmt.Errorf("error while sending agent request for gauge metric: %w", err)
 			}
 		}
 		time.Sleep(time.Duration(reportTimeout) * time.Second)

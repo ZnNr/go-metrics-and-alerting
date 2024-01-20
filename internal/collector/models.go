@@ -9,13 +9,5 @@ type MetricJSON struct {
 
 // collector представляет структуру коллектора метрик
 type collector struct {
-	storage *memStorage
-}
-
-// Структура memStorage представляет собой хранилище данных в памяти для коллектора метрик.
-// counters - это мапа, которая хранит значения счетчиков метрик.
-// gauges - это мапа, которая хранит значения показателей метрик.
-type memStorage struct {
-	Counters map[string]int
-	Gauges   map[string]string
+	Metrics []MetricJSON
 }

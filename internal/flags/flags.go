@@ -24,6 +24,15 @@ const (
 // Option - функция, которая изменяет поля структуры параметров
 type Option func(params *Params)
 
+func WithDatabase() Option {
+	return func(p *Params) {
+		flag.StringVar(&p.DatabaseAddress, "d", defaultAddr, "connection string for db")
+		if envDbAddr := os.Getenv("DATABASE_DSN"); envDbAddr != "" {
+			p.DatabaseAddress = envDbAddr
+		}
+	}
+}
+
 // WithAddr Опция для указания адреса сервера
 func WithAddr() Option {
 	return func(p *Params) {
@@ -111,6 +120,7 @@ func Init(opts ...Option) *Params {
 
 type Params struct {
 	FlagRunAddr     string // Адрес и порт сервера
+	DatabaseAddress string // Адрес базы данных
 	ReportInterval  int    // Интервал отчетов
 	PollInterval    int    // Интервал опроса
 	StoreInterval   int    // Интервал сохранения
