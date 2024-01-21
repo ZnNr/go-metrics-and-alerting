@@ -9,7 +9,7 @@ import (
 	"os"
 )
 
-func (m *manager) Restore(ctx context.Context) ([]collector.MetricJSON, error) {
+func (m *Manager) Restore(ctx context.Context) ([]collector.MetricJSON, error) {
 	file, err := os.OpenFile(m.fileName, os.O_RDONLY|os.O_CREATE, 0666)
 	if err != nil {
 		return nil, err
@@ -28,7 +28,7 @@ func (m *manager) Restore(ctx context.Context) ([]collector.MetricJSON, error) {
 	return metricsFromFile, nil
 }
 
-func (m *manager) Save(ctx context.Context, metrics []collector.MetricJSON) error {
+func (m *Manager) Save(ctx context.Context, metrics []collector.MetricJSON) error {
 	var saveError error
 	file, err := os.OpenFile(m.fileName, os.O_WRONLY|os.O_CREATE, 0666)
 	if err != nil {
@@ -58,10 +58,10 @@ func (m *manager) Save(ctx context.Context, metrics []collector.MetricJSON) erro
 	return saveError
 }
 
-func New(params *flags.Params) *manager {
-	return &manager{fileName: params.FileStoragePath}
+func New(params *flags.Params) *Manager {
+	return &Manager{fileName: params.FileStoragePath}
 }
 
-type manager struct {
+type Manager struct {
 	fileName string
 }

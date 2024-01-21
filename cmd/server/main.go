@@ -14,8 +14,8 @@ import (
 )
 
 func main() {
-	logger, err := zap.NewDevelopment() //  логер NewDevelopment
-	if err != nil {                     // вызываем панику, если ошибка
+	logger, err := zap.NewDevelopment()
+	if err != nil {
 		panic(err)
 	}
 	defer logger.Sync()
@@ -37,8 +37,8 @@ func main() {
 		"addr", params.FlagRunAddr,
 	)
 
+	// init restorer
 	var saver saver
-
 	if params.FileStoragePath != "" {
 		saver = file.New(params)
 	} else if params.DatabaseAddress != "" {
@@ -68,6 +68,7 @@ func main() {
 		log.SugarLogger.Fatalw(err.Error(), "event", "start server")
 	}
 }
+
 func saveMetrics(ctx context.Context, saver saver, interval int) {
 	ticker := time.NewTicker(time.Duration(interval) * time.Second)
 	for {

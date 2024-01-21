@@ -15,7 +15,7 @@ import (
 
 func TestSaveMetric(t *testing.T) {
 	r := chi.NewRouter()
-	h := handler{}
+	h := Handler{}
 	r.Post("/update/{type}/{name}/{value}", h.SaveMetric)
 	r.Get("/value/{type}/{name}", h.GetMetric)
 	r.Post("/update/", h.SaveMetricFromJSON)
@@ -114,7 +114,7 @@ func TestSaveMetric(t *testing.T) {
 
 func TestSaveMetricFromJSON(t *testing.T) {
 	r := chi.NewRouter()
-	h := handler{}
+	h := Handler{}
 	r.Post("/update/{type}/{name}/{value}", h.SaveMetric)
 	r.Get("/value/{type}/{name}", h.GetMetric)
 	r.Post("/update/", h.SaveMetricFromJSON)
@@ -214,7 +214,7 @@ func TestSaveMetricFromJSON(t *testing.T) {
 
 func TestGetMetric(t *testing.T) {
 	r := chi.NewRouter()
-	h := handler{}
+	h := Handler{}
 	r.Post("/update/{type}/{name}/{value}", h.SaveMetric)
 	r.Get("/value/{type}/{name}", h.GetMetric)
 	srv := httptest.NewServer(r)
@@ -311,7 +311,7 @@ func TestGetMetric(t *testing.T) {
 
 func TestGetMetricFromJSON(t *testing.T) {
 	r := chi.NewRouter()
-	h := handler{}
+	h := Handler{}
 	r.Post("/update/{type}/{name}/{value}", h.SaveMetric)
 	r.Post("/value/", h.GetMetricFromJSON)
 	srv := httptest.NewServer(r)
@@ -401,7 +401,7 @@ func TestGetMetricFromJSON(t *testing.T) {
 
 func TestShowMetrics(t *testing.T) {
 	r := chi.NewRouter()
-	h := handler{}
+	h := Handler{}
 	r.Post("/update/{type}/{name}/{value}", h.SaveMetric)
 	r.Get("/", h.ShowMetrics)
 	srv := httptest.NewServer(r)

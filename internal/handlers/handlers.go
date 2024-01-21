@@ -17,7 +17,7 @@ import (
 	"time"
 )
 
-func (h *handler) SaveMetric(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) SaveMetric(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		return
@@ -70,7 +70,7 @@ func (h *handler) SaveMetric(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("content-length", strconv.Itoa(len(metricName)))
 }
 
-func (h *handler) SaveMetricFromJSON(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) SaveMetricFromJSON(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		return
@@ -123,7 +123,7 @@ func (h *handler) SaveMetricFromJSON(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-func (h *handler) GetMetricFromJSON(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) GetMetricFromJSON(w http.ResponseWriter, r *http.Request) {
 	var buf bytes.Buffer
 	if _, err := buf.ReadFrom(r.Body); err != nil {
 		w.WriteHeader(http.StatusBadRequest)
@@ -159,7 +159,7 @@ func (h *handler) GetMetricFromJSON(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-func (h *handler) GetMetric(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) GetMetric(w http.ResponseWriter, r *http.Request) {
 	metricType := chi.URLParam(r, "type")
 	metricName := chi.URLParam(r, "name")
 
@@ -193,7 +193,7 @@ func (h *handler) GetMetric(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("content-type", "text/plain; charset=utf-8")
 }
 
-func (h *handler) ShowMetrics(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) ShowMetrics(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("content-type", "Content-Type: text/html; charset=utf-8")
 	if r.URL.Path != "/" {
 		http.Error(w, fmt.Sprintf("wrong path %q", r.URL.Path), http.StatusNotFound)
@@ -210,7 +210,7 @@ func (h *handler) ShowMetrics(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("content-type", "Content-Type: text/html; charset=utf-8")
 }
 
-func (h *handler) Ping(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) Ping(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 
@@ -221,21 +221,20 @@ func (h *handler) Ping(w http.ResponseWriter, r *http.Request) {
 	defer db.Close()
 	if err := db.PingContext(ctx); err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
-		return
 	} else {
 		w.WriteHeader(http.StatusOK)
 	}
-	if _, err = w.Write([]byte("pong")); err != nil {
+	_, err = w.Write([]byte("pong"))
+	if err != nil {
 		return
 	}
 }
-
-func New(db string) *handler {
-	return &handler{
+func New(db string) *Handler {
+	return &Handler{
 		dbAddress: db,
 	}
 }
 
-type handler struct {
+type Handler struct {
 	dbAddress string
 }

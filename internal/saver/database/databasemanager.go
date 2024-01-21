@@ -8,7 +8,7 @@ import (
 	"github.com/ZnNr/go-musthave-metrics.git/internal/flags"
 )
 
-func (m *manager) Restore(ctx context.Context) ([]collector.MetricJSON, error) {
+func (m *Manager) Restore(ctx context.Context) ([]collector.MetricJSON, error) {
 	const query = `select id, mtype, delta, mvalue from metrics`
 	rows, err := m.db.QueryContext(ctx, query)
 	if err != nil {
@@ -41,7 +41,7 @@ func (m *manager) Restore(ctx context.Context) ([]collector.MetricJSON, error) {
 	return metrics, nil
 }
 
-func (m *manager) Save(ctx context.Context, metrics []collector.MetricJSON) error {
+func (m *Manager) Save(ctx context.Context, metrics []collector.MetricJSON) error {
 	for _, metric := range metrics {
 		switch metric.MType {
 		case "gauge":
@@ -59,7 +59,7 @@ func (m *manager) Save(ctx context.Context, metrics []collector.MetricJSON) erro
 	return nil
 }
 
-func (m *manager) init(ctx context.Context) error {
+func (m *Manager) init(ctx context.Context) error {
 	const query = `create table if not exists metrics (id text primary key, mtype text, delta bigint, mvalue double precision)`
 	if _, err := m.db.ExecContext(ctx, query); err != nil {
 		return fmt.Errorf("error while trying to create table: %w", err)
@@ -67,7 +67,7 @@ func (m *manager) init(ctx context.Context) error {
 	return nil
 }
 
-func New(params *flags.Params) (*manager, error) {
+func New(params *flags.Params) (*Manager, error) {
 	ctx := context.Background()
 	db, err := sql.Open("pgx", params.DatabaseAddress)
 	if err != nil {
@@ -75,7 +75,7 @@ func New(params *flags.Params) (*manager, error) {
 	}
 	defer db.Close()
 
-	m := manager{
+	m := Manager{
 		db: db,
 	}
 	if err := m.init(ctx); err != nil {
@@ -84,6 +84,6 @@ func New(params *flags.Params) (*manager, error) {
 	return &m, nil
 }
 
-type manager struct {
+type Manager struct {
 	db *sql.DB
 }
