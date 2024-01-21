@@ -221,11 +221,11 @@ func (h *handler) Ping(w http.ResponseWriter, r *http.Request) {
 	defer db.Close()
 	if err := db.PingContext(ctx); err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
+		return
 	} else {
 		w.WriteHeader(http.StatusOK)
 	}
-	_, err = w.Write([]byte("pong"))
-	if err != nil {
+	if _, err = w.Write([]byte("pong")); err != nil {
 		return
 	}
 }
