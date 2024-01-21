@@ -15,6 +15,9 @@ func (m *manager) Restore(ctx context.Context) ([]collector.MetricJSON, error) {
 		return nil, err
 	}
 	defer rows.Close()
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("rows error: %w", err)
+	}
 
 	var metrics []collector.MetricJSON
 	for rows.Next() {
