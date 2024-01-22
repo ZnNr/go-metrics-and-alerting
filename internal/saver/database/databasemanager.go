@@ -9,7 +9,7 @@ import (
 )
 
 func (m *Manager) Restore(ctx context.Context) ([]collector.MetricJSON, error) {
-	const query = `select id, mtype, delta, mvalue from metrics`
+	const query = `SELECT id, mtype, delta, mvalue FROM metrics`
 	rows, err := m.db.QueryContext(ctx, query)
 	if err != nil {
 		return nil, err
@@ -22,19 +22,27 @@ func (m *Manager) Restore(ctx context.Context) ([]collector.MetricJSON, error) {
 	var metrics []collector.MetricJSON
 	for rows.Next() {
 		var (
-			id     string
-			mtype  string
-			delta  int64
-			mvalue float64
+			id          string
+			mtype       string
+			deltaFromDB sql.NullInt64
+			valueFromDB sql.NullFloat64
 		)
-		if err := rows.Scan(&id, &mtype, &delta, &mvalue); err != nil {
+		if err := rows.Scan(&id, &mtype, &deltaFromDB, &valueFromDB); err != nil {
 			return nil, err
+		}
+		var delta *int64
+		if deltaFromDB.Valid {
+			delta = &deltaFromDB.Int64
+		}
+		var mvalue *float64
+		if valueFromDB.Valid {
+			mvalue = &valueFromDB.Float64
 		}
 		metric := collector.MetricJSON{
 			ID:    id,
 			MType: mtype,
-			Delta: &delta,
-			Value: &mvalue,
+			Delta: delta,
+			Value: mvalue,
 		}
 		metrics = append(metrics, metric)
 	}
@@ -45,12 +53,12 @@ func (m *Manager) Save(ctx context.Context, metrics []collector.MetricJSON) erro
 	for _, metric := range metrics {
 		switch metric.MType {
 		case "gauge":
-			query := `insert into metrics (id, mtype, mvalue) values ($1, $2, $3) ON CONFLICT (id) DO UPDATE SET mvalue = EXCLUDED.mvalue;`
+			query := `INSERT INTO metrics (id, mtype, mvalue) VALUES ($1, $2, $3) ON CONFLICT (id) DO UPDATE SET mvalue = EXCLUDED.mvalue;`
 			if _, err := m.db.ExecContext(ctx, query, metric.ID, metric.MType, metric.Value); err != nil {
 				return fmt.Errorf("error while trying to save gauge metric %q: %w", metric.ID, err)
 			}
 		case "counter":
-			query := `insert into metrics (id, mtype, delta) values ($1, $2, $3) ON CONFLICT (id) DO UPDATE SET delta = EXCLUDED.delta;`
+			query := `INSERT INTO metrics (id, mtype, delta) VALUES ($1, $2, $3) ON CONFLICT (id) DO UPDATE SET delta = EXCLUDED.delta;`
 			if _, err := m.db.ExecContext(ctx, query, metric.ID, metric.MType, metric.Delta); err != nil {
 				return fmt.Errorf("error while trying to save counter metric %q: %w", metric.ID, err)
 			}
@@ -60,7 +68,7 @@ func (m *Manager) Save(ctx context.Context, metrics []collector.MetricJSON) erro
 }
 
 func (m *Manager) init(ctx context.Context) error {
-	const query = `create table if not exists metrics (id text primary key, mtype text, delta bigint, mvalue double precision)`
+	const query = `CREATE TABLE if NOT EXIST metrics (id text PRIMARY KEY, mtype text, delta bigint, mvalue DOUBLE PRECISION)`
 	if _, err := m.db.ExecContext(ctx, query); err != nil {
 		return fmt.Errorf("error while trying to create table: %w", err)
 	}

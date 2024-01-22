@@ -37,9 +37,8 @@ func main() {
 		"addr", params.FlagRunAddr,
 	)
 
-	// init restorer
 	var saver saver
-	if params.FileStoragePath != "" {
+	if params.FileStoragePath != "" && params.DatabaseAddress == "" {
 		saver = file.New(params)
 	} else if params.DatabaseAddress != "" {
 		saver, err = database.New(params)
@@ -48,22 +47,23 @@ func main() {
 		}
 	}
 
-	// restore previous metrics if needed
+	// востановление предыдущих метрик в случае необходимости
 	ctx := context.Background()
-	if params.Restore {
+	if params.Restore && (params.FileStoragePath != "" || params.DatabaseAddress != "") {
 		metrics, err := saver.Restore(ctx)
 		if err != nil {
 			log.SugarLogger.Error(err.Error(), "restore error")
 		}
 		collector.Collector.Metrics = metrics
+		log.SugarLogger.Info("metrics restored")
 	}
 
-	// regularly save metrics if needed
+	// востановление метрик
 	if params.DatabaseAddress != "" || params.FileStoragePath != "" {
 		go saveMetrics(ctx, saver, params.StoreInterval)
 	}
 
-	// run server
+	// запуск сервера
 	if err := http.ListenAndServe(params.FlagRunAddr, r); err != nil {
 		log.SugarLogger.Fatalw(err.Error(), "event", "start server")
 	}
