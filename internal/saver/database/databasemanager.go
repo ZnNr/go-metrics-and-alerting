@@ -15,9 +15,9 @@ func (m *Manager) Restore(ctx context.Context) ([]collector.MetricJSON, error) {
 		return nil, err
 	}
 	defer rows.Close()
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("rows error: %w", err)
-	}
+	//if err := rows.Err(); err != nil {
+	//	return nil, fmt.Errorf("rows error: %w", err)
+	//}
 
 	var metrics []collector.MetricJSON
 	for rows.Next() {
@@ -81,7 +81,7 @@ func New(params *flags.Params) (*Manager, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer db.Close()
+	//defer db.Close()
 
 	m := Manager{
 		db: db,
