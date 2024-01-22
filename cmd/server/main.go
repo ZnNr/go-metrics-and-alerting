@@ -78,8 +78,6 @@ func saveMetrics(ctx context.Context, saver saver, interval int) {
 		case <-ticker.C:
 			if err := saver.Save(ctx, collector.Collector.Metrics); err != nil {
 				log.SugarLogger.Error(err.Error(), "save error")
-			} else {
-				log.SugarLogger.Info("successfully saved metrics")
 			}
 		}
 	}
