@@ -26,7 +26,7 @@ type Option func(params *Params)
 
 func WithDatabase() Option {
 	return func(p *Params) {
-		flag.StringVar(&p.DatabaseAddress, "d", "", "connection string for db")
+		flag.StringVar(&p.DatabaseAddress, "d", defaultAddr, "connection string for db")
 		if envDBAddr := os.Getenv("DATABASE_DSN"); envDBAddr != "" {
 			p.DatabaseAddress = envDBAddr
 		}
