@@ -81,8 +81,7 @@ func New(params *flags.Params) (*Manager, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer db.Close()
-
+	
 	m := Manager{
 		db: db,
 	}
