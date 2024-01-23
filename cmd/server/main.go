@@ -36,7 +36,7 @@ func main() {
 		"Starting server",
 		"addr", params.FlagRunAddr,
 	)
-
+	// Инициализация ресторера
 	var saver saver
 	if params.FileStoragePath != "" && params.DatabaseAddress == "" {
 		saver = file.New(params)
@@ -70,7 +70,7 @@ func main() {
 }
 
 func saveMetrics(ctx context.Context, saver saver, interval int) {
-	ticker := time.NewTicker(time.Duration(interval) * time.Second)
+	ticker := time.NewTicker(time.Duration(interval))
 	for {
 		select {
 		case <-ctx.Done():

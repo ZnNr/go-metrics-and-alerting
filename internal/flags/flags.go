@@ -16,7 +16,7 @@ const (
 	// Интервал сохранения по умолчанию (в секундах)
 	defaultStoreInterval int = 30
 	// Путь к файлу хранения по умолчанию
-	defaultFileStoragePath string = "/tmp/metrics-db.json"
+	defaultFileStoragePath string = "/tmp/short-url-db.json"
 	// Восстанавливать состояние по умолчанию или нет
 	defaultRestore bool = true
 )
