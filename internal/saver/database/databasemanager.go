@@ -68,7 +68,7 @@ func (m *Manager) Save(ctx context.Context, metrics []collector.MetricJSON) erro
 }
 
 func (m *Manager) init(ctx context.Context) error {
-	const query = `CREATE TABLE if NOT EXIST metrics (id text PRIMARY KEY, mtype text, delta bigint, mvalue DOUBLE PRECISION)`
+	const query = `CREATE TABLE if NOT EXISTS metrics (id text PRIMARY KEY, mtype text, delta bigint, mvalue DOUBLE PRECISION)`
 	if _, err := m.db.ExecContext(ctx, query); err != nil {
 		return fmt.Errorf("error while trying to create table: %w", err)
 	}
