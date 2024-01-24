@@ -48,6 +48,7 @@ type compressReader struct {
 	zr *gzip.Reader
 }
 
+// NewCompressReader создает экземпляр compressReader и инициализирует его.
 func NewCompressReader(r io.ReadCloser) (*compressReader, error) {
 	zr, err := gzip.NewReader(r)
 	if err != nil {
@@ -60,10 +61,12 @@ func NewCompressReader(r io.ReadCloser) (*compressReader, error) {
 	}, nil
 }
 
+// Read реализует метод Read интерфейса io.ReadCloser и выполняет чтение декомпрессированных данных.
 func (c compressReader) Read(p []byte) (n int, err error) {
 	return c.zr.Read(p)
 }
 
+// Close реализует метод Close интерфейса io.ReadCloser и закрывает все открытые ресурсы.
 func (c *compressReader) Close() error {
 	if err := c.r.Close(); err != nil {
 		return err
@@ -71,10 +74,10 @@ func (c *compressReader) Close() error {
 	return c.zr.Close()
 }
 
-func Compress(h http.Handler) http.Handler {
+// HTTPCompressHandler является обработчиком HTTP, который сжимает данные ответа, если клиент поддерживает сжатие.
+func HTTPCompressHandler(h http.Handler) http.Handler {
 	zipFn := func(w http.ResponseWriter, r *http.Request) {
 		ow := w
-
 		acceptEncoding := r.Header.Get("Accept-Encoding")
 		supportsGzip := strings.Contains(acceptEncoding, "gzip")
 		contentEncoding := r.Header.Get("Content-Encoding")
@@ -95,7 +98,6 @@ func Compress(h http.Handler) http.Handler {
 			defer cr.Close()
 		} else if supportsGzip && !sendsGzip {
 			cw := NewCompressWriter(w)
-
 			ow = cw
 			ow.Header().Set("Content-Encoding", "gzip")
 			defer cw.Close()

@@ -10,11 +10,11 @@ const (
 	// Адрес и порт сервера по умолчанию
 	defaultAddr string = "localhost:8080"
 	// Интервал отчетов по умолчанию (в секундах)
-	defaultReportInterval int = 10
+	defaultReportInterval int = 5
 	// Интервал опроса по умолчанию (в секундах)
-	defaultPollInterval int = 2
+	defaultPollInterval int = 1
 	// Интервал сохранения по умолчанию (в секундах)
-	defaultStoreInterval int = 30
+	defaultStoreInterval int = 15
 	// Путь к файлу хранения по умолчанию
 	defaultFileStoragePath string = "/tmp/short-url-db.json"
 	// Восстанавливать состояние по умолчанию или нет
@@ -24,12 +24,15 @@ const (
 // Option - функция, которая изменяет поля структуры параметров
 type Option func(params *Params)
 
+// WithDatabase - Опция для указания подключения к базе данных
 func WithDatabase() Option {
 	return func(p *Params) {
-		flag.StringVar(&p.DatabaseAddress, "d", "", "connection string for db")
+		result := ""
+		flag.StringVar(&result, "d", "", "connection string for db")
 		if envDBAddr := os.Getenv("DATABASE_DSN"); envDBAddr != "" {
-			p.DatabaseAddress = envDBAddr
+			result = envDBAddr
 		}
+		p.DatabaseAddress = result
 	}
 }
 

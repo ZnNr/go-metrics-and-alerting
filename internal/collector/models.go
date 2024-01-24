@@ -1,13 +1,25 @@
 package collector
 
-type MetricJSON struct {
+const (
+	Counter = "counter" // тип метрики для счетчика
+	Gauge   = "gauge"   // тип метрики для датчика
+)
+
+type MetricRequest struct {
 	ID    string   `json:"id"`              // имя метрики
 	MType string   `json:"type"`            // параметр, принимающий значение gauge или counter
 	Delta *int64   `json:"delta,omitempty"` // значение метрики в случае передачи counter
 	Value *float64 `json:"value,omitempty"` // значение метрики в случае передачи gauge
 }
 
-// collector представляет структуру коллектора метрик
+type StoredMetric struct {
+	ID           string   `json:"id"`                      // имя метрики
+	MType        string   `json:"type"`                    // параметр, принимающий значение gauge или counter
+	CounterValue *int64   `json:"counter_value,omitempty"` // значение метрики в случае передачи counter
+	GaugeValue   *float64 `json:"gauge_value,omitempty"`   // значение метрики в случае передачи gauge
+	TextValue    *string  `json:"text_value,omitempty"`    // значение метрики в случае передачи текста
+}
+
 type collector struct {
-	Metrics []MetricJSON
+	Metrics []StoredMetric
 }

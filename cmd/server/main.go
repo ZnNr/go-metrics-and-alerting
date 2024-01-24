@@ -37,6 +37,7 @@ func main() {
 		"addr", params.FlagRunAddr,
 	)
 	// Инициализация ресторера
+	// инициализация переменной saver типа saver, которая будет использоваться для восстановления и сохранения метрик.
 	var saver saver
 	if params.FileStoragePath != "" && params.DatabaseAddress == "" {
 		saver = file.New(params)
@@ -47,7 +48,7 @@ func main() {
 		}
 	}
 
-	// востановление предыдущих метрик в случае необходимости
+	// востановление предыдущих метрик
 	ctx := context.Background()
 	if params.Restore && (params.FileStoragePath != "" || params.DatabaseAddress != "") {
 		metrics, err := saver.Restore(ctx)
@@ -69,6 +70,7 @@ func main() {
 	}
 }
 
+// saveMetrics — горутина, которая периодически сохраняет метрики
 func saveMetrics(ctx context.Context, saver saver, interval int) {
 	ticker := time.NewTicker(time.Duration(interval))
 	for {
@@ -83,7 +85,8 @@ func saveMetrics(ctx context.Context, saver saver, interval int) {
 	}
 }
 
+// saver — интерфейс, определяющий методы восстановления и сохранения метрик.
 type saver interface {
-	Restore(ctx context.Context) ([]collector.MetricJSON, error)
-	Save(ctx context.Context, metrics []collector.MetricJSON) error
+	Restore(ctx context.Context) ([]collector.StoredMetric, error)
+	Save(ctx context.Context, metrics []collector.StoredMetric) error
 }

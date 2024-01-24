@@ -6,9 +6,10 @@ import (
 	"fmt"
 	"github.com/ZnNr/go-musthave-metrics.git/internal/collector"
 	"github.com/ZnNr/go-musthave-metrics.git/internal/flags"
+	"time"
 )
 
-func (m *Manager) Restore(ctx context.Context) ([]collector.MetricJSON, error) {
+func (m *Manager) Restore(ctx context.Context) ([]collector.StoredMetric, error) {
 	const query = `SELECT id, mtype, delta, mvalue FROM metrics`
 	rows, err := m.db.QueryContext(ctx, query)
 	if err != nil {
@@ -19,7 +20,7 @@ func (m *Manager) Restore(ctx context.Context) ([]collector.MetricJSON, error) {
 		return nil, fmt.Errorf("rows error: %w", err)
 	}
 
-	var metrics []collector.MetricJSON
+	var metrics []collector.StoredMetric
 	for rows.Next() {
 		var (
 			id          string
@@ -38,29 +39,46 @@ func (m *Manager) Restore(ctx context.Context) ([]collector.MetricJSON, error) {
 		if valueFromDB.Valid {
 			mvalue = &valueFromDB.Float64
 		}
-		metric := collector.MetricJSON{
-			ID:    id,
-			MType: mtype,
-			Delta: delta,
-			Value: mvalue,
+		metric := collector.StoredMetric{
+			ID:           id,
+			MType:        mtype,
+			CounterValue: delta,
+			GaugeValue:   mvalue,
 		}
 		metrics = append(metrics, metric)
 	}
 	return metrics, nil
 }
 
-func (m *Manager) Save(ctx context.Context, metrics []collector.MetricJSON) error {
+func (m *Manager) Save(ctx context.Context, metrics []collector.StoredMetric) error {
+	retries := []time.Duration{1 * time.Second, 3 * time.Second, 5 * time.Second}
 	for _, metric := range metrics {
 		switch metric.MType {
-		case "gauge":
+		case collector.Gauge:
 			query := `INSERT INTO metrics (id, mtype, mvalue) VALUES ($1, $2, $3) ON CONFLICT (id) DO UPDATE SET mvalue = EXCLUDED.mvalue;`
-			if _, err := m.db.ExecContext(ctx, query, metric.ID, metric.MType, metric.Value); err != nil {
-				return fmt.Errorf("error while trying to save gauge metric %q: %w", metric.ID, err)
+			var err error
+			for _, t := range retries {
+				if _, err = m.db.ExecContext(ctx, query, metric.ID, metric.MType, &metric.GaugeValue); err == nil {
+					break
+				} else {
+					time.Sleep(t)
+				}
 			}
-		case "counter":
+			if err != nil {
+				return fmt.Errorf("error while executing insert counter query: %w", err)
+			}
+		case collector.Counter:
 			query := `INSERT INTO metrics (id, mtype, delta) VALUES ($1, $2, $3) ON CONFLICT (id) DO UPDATE SET delta = EXCLUDED.delta;`
-			if _, err := m.db.ExecContext(ctx, query, metric.ID, metric.MType, metric.Delta); err != nil {
-				return fmt.Errorf("error while trying to save counter metric %q: %w", metric.ID, err)
+			var err error
+			for _, t := range retries {
+				if _, err = m.db.ExecContext(ctx, query, metric.ID, metric.MType, &metric.CounterValue); err == nil {
+					break
+				} else {
+					time.Sleep(t)
+				}
+			}
+			if err != nil {
+				return fmt.Errorf("error while executing insert counter query: %w", err)
 			}
 		}
 	}
@@ -81,7 +99,7 @@ func New(params *flags.Params) (*Manager, error) {
 	if err != nil {
 		return nil, err
 	}
-	
+
 	m := Manager{
 		db: db,
 	}

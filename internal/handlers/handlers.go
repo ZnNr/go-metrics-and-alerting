@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"github.com/ZnNr/go-musthave-metrics.git/internal/collector"
-	"github.com/ZnNr/go-musthave-metrics.git/internal/storage"
 	"github.com/go-chi/chi/v5"
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"html/template"
@@ -18,7 +17,7 @@ import (
 	"time"
 )
 
-func (h *Handler) SaveMetric(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) SaveMetricHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		return
@@ -28,31 +27,11 @@ func (h *Handler) SaveMetric(w http.ResponseWriter, r *http.Request) {
 	metricName := chi.URLParam(r, "name")
 	metricValue := chi.URLParam(r, "value")
 
-	if metricName == "" {
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-	metric := collector.MetricJSON{
+	metric := collector.MetricRequest{
 		ID:    metricName,
 		MType: metricType,
 	}
-	switch metricType {
-	case "counter":
-		v, err := strconv.Atoi(metricValue)
-		if err != nil {
-			w.WriteHeader(http.StatusBadRequest)
-			return
-		}
-		metric.Delta = storage.PtrInt64(int64(v))
-	case "gauge":
-		v, err := strconv.ParseFloat(metricValue, 64)
-		if err != nil {
-			w.WriteHeader(http.StatusBadRequest)
-			return
-		}
-		metric.Value = &v
-	}
-	err := collector.Collector.Collect(metric)
+	err := collector.Collector.Collect(metric, metricValue)
 	if errors.Is(err, collector.ErrBadRequest) {
 		w.WriteHeader(http.StatusBadRequest)
 		return
@@ -63,7 +42,7 @@ func (h *Handler) SaveMetric(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusOK)
-	if _, err = io.WriteString(w, fmt.Sprintf("inserted metric %q with value %q", metricName, metricValue)); err != nil {
+	if _, err := io.WriteString(w, fmt.Sprintf("inserted metric %q with value %q", metricName, metricValue)); err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -71,7 +50,7 @@ func (h *Handler) SaveMetric(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("content-length", strconv.Itoa(len(metricName)))
 }
 
-func (h *Handler) SaveMetricFromJSON(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) SaveMetricFromJSONHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		return
@@ -82,17 +61,22 @@ func (h *Handler) SaveMetricFromJSON(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var metric collector.MetricJSON
+	var metric collector.MetricRequest
 	if err := json.Unmarshal(buf.Bytes(), &metric); err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	if metric.ID == "" {
-		w.WriteHeader(http.StatusBadRequest)
-		return
+
+	metricValue := ""
+	switch metric.MType {
+	case collector.Counter:
+		metricValue = strconv.Itoa(int(*metric.Delta))
+	case collector.Gauge:
+		metricValue = strconv.FormatFloat(*metric.Value, 'f', 11, 64)
+	default:
 	}
 
-	err := collector.Collector.Collect(metric)
+	err := collector.Collector.Collect(metric, metricValue)
 	if errors.Is(err, collector.ErrBadRequest) {
 		w.WriteHeader(http.StatusBadRequest)
 		return
@@ -124,7 +108,7 @@ func (h *Handler) SaveMetricFromJSON(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-func (h *Handler) SaveListMetricsFromJSON(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) SaveListMetricsFromJSONHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		return
@@ -135,7 +119,7 @@ func (h *Handler) SaveListMetricsFromJSON(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	var metrics []collector.MetricJSON
+	var metrics []collector.MetricRequest
 	if err := json.Unmarshal(buf.Bytes(), &metrics); err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		return
@@ -143,12 +127,17 @@ func (h *Handler) SaveListMetricsFromJSON(w http.ResponseWriter, r *http.Request
 
 	var results []byte
 	for _, metric := range metrics {
-		if metric.ID == "" {
-			w.WriteHeader(http.StatusBadRequest)
-			return
+
+		metricValue := ""
+		switch metric.MType {
+		case collector.Counter:
+			metricValue = strconv.Itoa(int(*metric.Delta))
+		case collector.Gauge:
+			metricValue = strconv.FormatFloat(*metric.Value, 'f', 11, 64)
+		default:
 		}
 
-		err := collector.Collector.Collect(metric)
+		err := collector.Collector.Collect(metric, metricValue)
 		if errors.Is(err, collector.ErrBadRequest) {
 			w.WriteHeader(http.StatusBadRequest)
 			return
@@ -180,20 +169,20 @@ func (h *Handler) SaveListMetricsFromJSON(w http.ResponseWriter, r *http.Request
 	w.WriteHeader(http.StatusOK)
 }
 
-func (h *Handler) GetMetricFromJSON(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) GetMetricFromJSONHandler(w http.ResponseWriter, r *http.Request) {
 	var buf bytes.Buffer
 	if _, err := buf.ReadFrom(r.Body); err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
-	var metric collector.MetricJSON
+	var metric collector.MetricRequest
 	if err := json.Unmarshal(buf.Bytes(), &metric); err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
-	resultJSON, err := collector.Collector.GetMetricJSON(metric.ID)
+	resultJSON, err := collector.Collector.GetMetric(metric.ID)
 	if errors.Is(err, collector.ErrBadRequest) {
 		w.WriteHeader(http.StatusBadRequest)
 		return
@@ -206,21 +195,28 @@ func (h *Handler) GetMetricFromJSON(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNotImplemented)
 		return
 	}
+	switch metric.MType {
+	case collector.Counter:
+		metric.Delta = resultJSON.CounterValue
+	case collector.Gauge:
+		metric.Value = resultJSON.GaugeValue
+	}
+	answer, _ := json.Marshal(metric)
 
 	w.Header().Set("content-type", "application/json")
-	if _, err = w.Write(resultJSON); err != nil {
+	if _, err = w.Write(answer); err != nil {
 		return
 	}
 	w.Header().Set("content-length", strconv.Itoa(len(metric.ID)))
-	w.Header().Set("content-type", "application/json")
+	//w.Header().Set("content-type", "application/json")
 	w.WriteHeader(http.StatusOK)
 }
 
-func (h *Handler) GetMetric(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) GetMetricHandler(w http.ResponseWriter, r *http.Request) {
 	metricType := chi.URLParam(r, "type")
 	metricName := chi.URLParam(r, "name")
 
-	if metricType != "counter" && metricType != "gauge" {
+	if metricType != collector.Counter && metricType != collector.Gauge {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
@@ -235,22 +231,14 @@ func (h *Handler) GetMetric(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusOK)
-	switch metricType {
-	case "counter":
-		if _, err = io.WriteString(w, fmt.Sprintf("%d", *value.Delta)); err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			return
-		}
-	case "gauge":
-		if _, err = io.WriteString(w, fmt.Sprintf("%.3f", *value.Value)); err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			return
-		}
+	if _, err = io.WriteString(w, *value.TextValue); err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
 	}
 	w.Header().Set("content-type", "text/plain; charset=utf-8")
 }
 
-func (h *Handler) ShowMetrics(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) ShowMetricsHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("content-type", "Content-Type: text/html; charset=utf-8")
 	if r.URL.Path != "/" {
 		http.Error(w, fmt.Sprintf("wrong path %q", r.URL.Path), http.StatusNotFound)
@@ -267,7 +255,8 @@ func (h *Handler) ShowMetrics(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("content-type", "Content-Type: text/html; charset=utf-8")
 }
 
-func (h *Handler) Ping(w http.ResponseWriter, r *http.Request) {
+// CheckDatabaseAvailability выполняет проверку доступности базы данных (Ping).
+func (h *Handler) CheckDatabaseAvailability(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 
@@ -278,11 +267,11 @@ func (h *Handler) Ping(w http.ResponseWriter, r *http.Request) {
 	defer db.Close()
 	if err := db.PingContext(ctx); err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
+		return
 	} else {
 		w.WriteHeader(http.StatusOK)
 	}
-	_, err = w.Write([]byte("pong"))
-	if err != nil {
+	if _, err = w.Write([]byte("pong")); err != nil {
 		return
 	}
 }

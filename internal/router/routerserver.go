@@ -13,14 +13,14 @@ func New(params flags.Params) *chi.Mux {
 
 	r := chi.NewRouter()
 	r.Use(log.RequestLogger)
-	r.Use(compressor.Compress)
-	r.Post("/update/", handler.SaveMetricFromJSON)
-	r.Post("/value/", handler.GetMetricFromJSON)
-	r.Post("/update/{type}/{name}/{value}", handler.SaveMetric)
-	r.Get("/value/{type}/{name}", handler.GetMetric)
-	r.Get("/", handler.ShowMetrics)
-	r.Get("/ping", handler.Ping)
-	r.Post("/updates/", handler.SaveListMetricsFromJSON)
+	r.Use(compressor.HTTPCompressHandler)
+	r.Post("/update/", handler.SaveMetricFromJSONHandler)
+	r.Post("/value/", handler.GetMetricFromJSONHandler)
+	r.Post("/update/{type}/{name}/{value}", handler.SaveMetricHandler)
+	r.Get("/value/{type}/{name}", handler.GetMetricHandler)
+	r.Get("/", handler.ShowMetricsHandler)
+	r.Get("/ping", handler.CheckDatabaseAvailability)
+	r.Post("/updates/", handler.SaveListMetricsFromJSONHandler)
 
 	return r
 }

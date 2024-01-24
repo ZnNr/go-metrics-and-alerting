@@ -3,6 +3,7 @@ package collector
 import (
 	"encoding/json"
 	"errors"
+	"strconv"
 )
 
 var (
@@ -16,29 +17,49 @@ var (
 
 // Collector Определен экземпляр структуры collector с именем Collector
 var Collector = collector{
-	Metrics: make([]MetricJSON, 0),
+	Metrics: make([]StoredMetric, 0),
 }
 
 // Collect добавляет собранную метрику в коллектор
-func (c *collector) Collect(metric MetricJSON) error {
-	if (metric.Delta != nil && *metric.Delta < 0) || (metric.Value != nil && *metric.Value < 0) {
+func (c *collector) Collect(metric MetricRequest, metricValue string) error {
+	if (metric.Delta != nil && *metric.Delta < 0) || (metric.Value != nil && *metric.Value < 0) || metric.ID == "" {
 		return ErrBadRequest
 	}
+
 	switch metric.MType {
-	case "counter":
+	case Counter:
 		v, err := c.GetMetric(metric.ID)
 		if err != nil {
 			if !errors.Is(err, ErrNotFound) {
 				return err
 			}
 		}
-		if v.Delta != nil {
-			*metric.Delta += *v.Delta
+		value, err := strconv.Atoi(metricValue)
+		if err != nil {
+			return ErrBadRequest
 		}
-		c.UpsertMetric(metric)
-
-	case "gauge":
-		c.UpsertMetric(metric)
+		if v.CounterValue != nil {
+			value = value + int(*v.CounterValue)
+		}
+		metricToStore := StoredMetric{
+			ID:           metric.ID,
+			MType:        metric.MType,
+			CounterValue: PtrInt64(int64(value)),
+			TextValue:    PtrString(strconv.Itoa(value)),
+		}
+		c.UpsertMetric(metricToStore)
+	case Gauge:
+		value, err := strconv.ParseFloat(metricValue, 64)
+		if err != nil {
+			return ErrBadRequest
+		}
+		metricToStore := StoredMetric{
+			ID:         metric.ID,
+			MType:      metric.MType,
+			GaugeValue: &value,
+			TextValue:  &metricValue,
+		}
+		c.UpsertMetric(metricToStore)
 	default:
 		return ErrNotImplemented
 	}
@@ -59,13 +80,13 @@ func (c *collector) GetMetricJSON(metricName string) ([]byte, error) {
 }
 
 // GetMetric возвращает значение заданной метрики по имени метрики
-func (c *collector) GetMetric(metricName string) (MetricJSON, error) {
+func (c *collector) GetMetric(metricName string) (StoredMetric, error) {
 	for _, m := range c.Metrics {
 		if m.ID == metricName {
 			return m, nil
 		}
 	}
-	return MetricJSON{}, ErrNotFound
+	return StoredMetric{}, ErrNotFound
 }
 
 // GetAvailableMetrics Метод возвращает слайс с доступными метриками.
@@ -78,7 +99,8 @@ func (c *collector) GetAvailableMetrics() []string {
 	return names
 }
 
-func (c *collector) UpsertMetric(metric MetricJSON) {
+// UpsertMetric добавляет или обновляет метрику в коллекторе.
+func (c *collector) UpsertMetric(metric StoredMetric) {
 	for i, m := range c.Metrics {
 		if m.ID == metric.ID {
 			c.Metrics[i] = metric
@@ -86,4 +108,19 @@ func (c *collector) UpsertMetric(metric MetricJSON) {
 		}
 	}
 	c.Metrics = append(c.Metrics, metric)
+}
+
+// PtrFloat64 создает указатель на float64 с заданным значением.
+func PtrFloat64(f float64) *float64 {
+	return &f
+}
+
+// PtrInt64 создает указатель на int64 с заданным значением.
+func PtrInt64(i int64) *int64 {
+	return &i
+}
+
+// PtrString создает указатель на строку с заданным значением.
+func PtrString(s string) *string {
+	return &s
 }
