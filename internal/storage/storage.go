@@ -41,9 +41,6 @@ func (st *Storage) Store() {
 	st.metricsCollector.UpsertMetric(collector.StoredMetric{ID: "TotalAlloc", MType: "gauge", GaugeValue: collector.PtrFloat64(float64(metrics.TotalAlloc)), TextValue: collector.PtrString(strconv.FormatFloat(float64(metrics.TotalAlloc), 'f', 11, 64))})
 	st.metricsCollector.UpsertMetric(collector.StoredMetric{ID: "RandomValue", MType: "gauge", GaugeValue: collector.PtrFloat64(float64(rand.Int())), TextValue: collector.PtrString(strconv.FormatFloat(float64(rand.Int()), 'f', 11, 64))})
 	st.metricsCollector.UpsertMetric(collector.StoredMetric{ID: "LastGC", MType: "gauge", GaugeValue: collector.PtrFloat64(float64(metrics.LastGC)), TextValue: collector.PtrString(strconv.FormatFloat(float64(metrics.LastGC), 'f', 11, 64))})
-	st.metricsCollector.UpsertMetric(collector.StoredMetric{ID: "TotalMemory", MType: "gauge", GaugeValue: collector.PtrFloat64(float64(metrics.BySize[0].Size)), TextValue: collector.PtrString(strconv.FormatFloat(float64(metrics.BySize[0].Size), 'f', 11, 64))})
-	st.metricsCollector.UpsertMetric(collector.StoredMetric{ID: "FreeMemory", MType: "gauge", GaugeValue: collector.PtrFloat64(float64(metrics.Frees)), TextValue: collector.PtrString(strconv.FormatFloat(float64(metrics.Frees), 'f', 11, 64))})
-	st.metricsCollector.UpsertMetric(collector.StoredMetric{ID: "CPUutilization1", MType: "gauge", GaugeValue: collector.PtrFloat64(metrics.GCCPUFraction), TextValue: collector.PtrString(strconv.FormatFloat(metrics.GCCPUFraction, 'f', 11, 64))})
 
 	cnt, _ := st.metricsCollector.GetMetric("PollCount")
 	counter := int64(0)
