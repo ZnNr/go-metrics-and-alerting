@@ -27,7 +27,7 @@ func RequestLogger(h http.Handler) http.Handler {
 			"duration", duration,
 			"size", rd.size, // получаем перехваченный размер ответа
 			"request headers", r.Header,
-			"responce headers", w.Header(),
+			"response headers", w.Header(),
 		)
 		w.Header().Set("content-type", "Content-Type: application/json")
 	}
