@@ -26,16 +26,13 @@ func main() {
 		flags.WithAddr(),
 		flags.WithStoreInterval(),
 		flags.WithFileStoragePath(),
-		flags.WithRestore(),
-		flags.WithDatabase(),
+		flags.WithRestore(), flags.WithDatabase(),
+		flags.WithKey(),
 	)
 
 	r := router.New(*params)
 
-	log.SugarLogger.Infow(
-		"Starting server",
-		"addr", params.FlagRunAddr,
-	)
+	log.SugarLogger.Infow("Starting server", "addr", params.FlagRunAddr)
 	// Инициализация ресторера
 	// инициализация переменной saver типа saver, которая будет использоваться для восстановления и сохранения метрик.
 	var saver saver

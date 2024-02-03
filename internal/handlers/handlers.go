@@ -3,6 +3,7 @@ package handlers
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"database/sql"
 	"encoding/json"
 	"errors"
@@ -61,6 +62,20 @@ func (h *Handler) SaveMetricFromJSONHandler(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
+	gotHash := r.Header.Get("HashSHA256")
+	want := h.getHash(buf.Bytes())
+	if gotHash != "" {
+		w.Header().Set("HashSHA256", want)
+	}
+
+	if !h.checkSubscription(want, gotHash) {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	if gotHash != "" {
+		w.Header().Set("HashSHA256", gotHash)
+	}
+
 	var metric collector.MetricRequest
 	if err := json.Unmarshal(buf.Bytes(), &metric); err != nil {
 		w.WriteHeader(http.StatusBadRequest)
@@ -109,6 +124,7 @@ func (h *Handler) SaveMetricFromJSONHandler(w http.ResponseWriter, r *http.Reque
 }
 
 func (h *Handler) SaveListMetricsFromJSONHandler(w http.ResponseWriter, r *http.Request) {
+	fmt.Println(collector.Collector.Metrics)
 	if r.Method != http.MethodPost {
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		return
@@ -122,6 +138,9 @@ func (h *Handler) SaveListMetricsFromJSONHandler(w http.ResponseWriter, r *http.
 	var metrics []collector.MetricRequest
 	if err := json.Unmarshal(buf.Bytes(), &metrics); err != nil {
 		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	if funcGotHash(w, r, h, buf) {
 		return
 	}
 
@@ -176,6 +195,10 @@ func (h *Handler) GetMetricFromJSONHandler(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
+	if funcGotHash(w, r, h, buf) {
+		return
+	}
+
 	var metric collector.MetricRequest
 	if err := json.Unmarshal(buf.Bytes(), &metric); err != nil {
 		w.WriteHeader(http.StatusBadRequest)
@@ -203,13 +226,14 @@ func (h *Handler) GetMetricFromJSONHandler(w http.ResponseWriter, r *http.Reques
 	}
 	answer, _ := json.Marshal(metric)
 
-	w.Header().Set("content-type", "application/json")
+	//w.Header().Set("content-type", "application/json")
 	if _, err = w.Write(answer); err != nil {
 		return
 	}
 	w.Header().Set("content-length", strconv.Itoa(len(metric.ID)))
-	//w.Header().Set("content-type", "application/json")
+	w.Header().Set("content-type", "application/json")
 	w.WriteHeader(http.StatusOK)
+	fmt.Println("HEADERS: ", w.Header())
 }
 
 func (h *Handler) GetMetricHandler(w http.ResponseWriter, r *http.Request) {
@@ -275,12 +299,45 @@ func (h *Handler) CheckDatabaseAvailability(w http.ResponseWriter, r *http.Reque
 		return
 	}
 }
-func New(db string) *Handler {
+func (h *Handler) checkSubscription(want, header string) bool {
+	if h.key != "" && len(want) != 0 && header != "" {
+		//h := hmac.New(sha256.New, []byte(h.key))
+		//h.Write(body)
+		//dst := h.Sum(nil)
+		//return fmt.Sprintf("%x", dst) == header
+		return header == want
+	}
+	return true
+}
+
+func funcGotHash(w http.ResponseWriter, r *http.Request, h *Handler, buf bytes.Buffer) bool {
+	gotHash := r.Header.Get("HashSHA256")
+	want := h.getHash(buf.Bytes())
+	if gotHash != "" {
+		w.Header().Set("HashSHA256", h.getHash(buf.Bytes()))
+	}
+	if !h.checkSubscription(want, gotHash) {
+		w.WriteHeader(http.StatusBadRequest)
+		return true
+	}
+	return false
+
+}
+
+func (h *Handler) getHash(body []byte) string {
+	want := sha256.Sum256(body)
+	wantDecoded := fmt.Sprintf("%x", want)
+	return wantDecoded
+}
+
+func New(db string, key string) *Handler {
 	return &Handler{
 		dbAddress: db,
+		key:       key,
 	}
 }
 
 type Handler struct {
 	dbAddress string
+	key       string
 }

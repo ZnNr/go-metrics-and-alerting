@@ -24,6 +24,15 @@ const (
 // Option - функция, которая изменяет поля структуры параметров
 type Option func(params *Params)
 
+func WithKey() Option {
+	return func(p *Params) {
+		flag.StringVar(&p.Key, "k", "", "key for using hash subscription")
+		if envKey := os.Getenv("KEY"); envKey != "" {
+			p.Key = envKey
+		}
+	}
+}
+
 // WithDatabase - Опция для указания подключения к базе данных
 func WithDatabase() Option {
 	return func(p *Params) {
@@ -129,4 +138,5 @@ type Params struct {
 	StoreInterval   int    // Интервал сохранения
 	FileStoragePath string // Путь к хранилищу файлов
 	Restore         bool   // Флаг восстановления данных
+	Key             string
 }
