@@ -10,13 +10,13 @@ const (
 	// Адрес и порт сервера по умолчанию
 	defaultAddr string = "localhost:8080"
 	// Интервал отчетов по умолчанию (в секундах)
-	defaultReportInterval int = 10
+	defaultReportInterval int = 5
 	// Интервал опроса по умолчанию (в секундах)
-	defaultPollInterval int = 2
+	defaultPollInterval int = 1
 	// Интервал сохранения по умолчанию (в секундах)
-	defaultStoreInterval int = 300
+	defaultStoreInterval int = 15
 	// Путь к файлу хранения по умолчанию
-	defaultFileStoragePath string = "/tmp/metrics-db.json"
+	defaultFileStoragePath string = "/tmp/short-url-db.json"
 	// Восстанавливать состояние по умолчанию или нет
 	defaultRestore bool = true
 )
@@ -24,12 +24,24 @@ const (
 // Option - функция, которая изменяет поля структуры параметров
 type Option func(params *Params)
 
+// WithDatabase - Опция для указания подключения к базе данных
+func WithDatabase() Option {
+	return func(p *Params) {
+		result := ""
+		flag.StringVar(&result, "d", "", "connection string for db")
+		if envDBAddr := os.Getenv("DATABASE_DSN"); envDBAddr != "" {
+			result = envDBAddr
+		}
+		p.DatabaseAddress = result
+	}
+}
+
 // WithAddr Опция для указания адреса сервера
 func WithAddr() Option {
 	return func(p *Params) {
-		flag.StringVar(&p.FlagRunAddr, "a", defaultAddr, "address and port to run server") // Установка флага командной строки для адреса и порта сервера
+		flag.StringVar(&p.FlagRunAddr, "a", defaultAddr, "address and port to run server")
 		if envRunAddr := os.Getenv("ADDRESS"); envRunAddr != "" {
-			p.FlagRunAddr = envRunAddr // Если переменная среды ADDRESS задана, используется ее значение
+			p.FlagRunAddr = envRunAddr
 		}
 	}
 }
@@ -37,11 +49,11 @@ func WithAddr() Option {
 // WithReportInterval Опция для указания интервала отчетов
 func WithReportInterval() Option {
 	return func(p *Params) {
-		flag.IntVar(&p.ReportInterval, "r", defaultReportInterval, "report interval") // Установка флага командной строки для интервала отчетов
+		flag.IntVar(&p.ReportInterval, "r", defaultReportInterval, "report interval")
 		if envReportInterval := os.Getenv("REPORT_INTERVAL"); envReportInterval != "" {
 			reportIntervalEnv, err := strconv.Atoi(envReportInterval)
 			if err == nil {
-				p.ReportInterval = reportIntervalEnv // Если переменная среды REPORT_INTERVAL задана, проверяется и используется ее значение
+				p.ReportInterval = reportIntervalEnv
 			}
 		}
 	}
@@ -50,11 +62,11 @@ func WithReportInterval() Option {
 // WithPollInterval Опция для указания интервала опроса
 func WithPollInterval() Option {
 	return func(p *Params) {
-		flag.IntVar(&p.PollInterval, "p", defaultPollInterval, "poll interval") // Установка флага командной строки для интервала опроса
+		flag.IntVar(&p.PollInterval, "p", defaultPollInterval, "poll interval")
 		if envPollInterval := os.Getenv("POLL_INTERVAL"); envPollInterval != "" {
 			pollIntervalEnv, err := strconv.Atoi(envPollInterval)
 			if err == nil {
-				p.PollInterval = pollIntervalEnv // Если переменная среды POLL_INTERVAL задана, проверяется и используется ее значение
+				p.PollInterval = pollIntervalEnv
 			}
 		}
 	}
@@ -111,6 +123,7 @@ func Init(opts ...Option) *Params {
 
 type Params struct {
 	FlagRunAddr     string // Адрес и порт сервера
+	DatabaseAddress string // Адрес базы данных
 	ReportInterval  int    // Интервал отчетов
 	PollInterval    int    // Интервал опроса
 	StoreInterval   int    // Интервал сохранения

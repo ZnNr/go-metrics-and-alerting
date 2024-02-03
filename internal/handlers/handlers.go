@@ -2,31 +2,36 @@ package handlers
 
 import (
 	"bytes"
+	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/ZnNr/go-musthave-metrics.git/internal/collector"
 	"github.com/go-chi/chi/v5"
+	_ "github.com/jackc/pgx/v5/stdlib"
 	"html/template"
 	"io"
 	"net/http"
 	"strconv"
+	"time"
 )
 
-func SaveMetric(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) SaveMetricHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		return
 	}
+
 	metricType := chi.URLParam(r, "type")
 	metricName := chi.URLParam(r, "name")
 	metricValue := chi.URLParam(r, "value")
 
-	if metricName == "" {
-		w.WriteHeader(http.StatusBadRequest)
-		return
+	metric := collector.MetricRequest{
+		ID:    metricName,
+		MType: metricType,
 	}
-	err := collector.Collector.Collect(metricName, metricType, metricValue)
+	err := collector.Collector.Collect(metric, metricValue)
 	if errors.Is(err, collector.ErrBadRequest) {
 		w.WriteHeader(http.StatusBadRequest)
 		return
@@ -37,7 +42,7 @@ func SaveMetric(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusOK)
-	if _, err = io.WriteString(w, ""); err != nil {
+	if _, err := io.WriteString(w, fmt.Sprintf("inserted metric %q with value %q", metricName, metricValue)); err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -45,7 +50,7 @@ func SaveMetric(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("content-length", strconv.Itoa(len(metricName)))
 }
 
-func SaveMetricFromJSON(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) SaveMetricFromJSONHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		return
@@ -56,17 +61,22 @@ func SaveMetricFromJSON(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var metric collector.MetricJSON
+	var metric collector.MetricRequest
 	if err := json.Unmarshal(buf.Bytes(), &metric); err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	if metric.ID == "" {
-		w.WriteHeader(http.StatusBadRequest)
-		return
+
+	metricValue := ""
+	switch metric.MType {
+	case collector.Counter:
+		metricValue = strconv.Itoa(int(*metric.Delta))
+	case collector.Gauge:
+		metricValue = strconv.FormatFloat(*metric.Value, 'f', 11, 64)
+	default:
 	}
 
-	err := collector.Collector.CollectFromJSON(metric)
+	err := collector.Collector.Collect(metric, metricValue)
 	if errors.Is(err, collector.ErrBadRequest) {
 		w.WriteHeader(http.StatusBadRequest)
 		return
@@ -76,7 +86,7 @@ func SaveMetricFromJSON(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	resultJSON, err := collector.Collector.GetMetricJSON(metric.ID, metric.MType)
+	resultJSON, err := collector.Collector.GetMetricJSON(metric.ID)
 	if errors.Is(err, collector.ErrBadRequest) {
 		w.WriteHeader(http.StatusBadRequest)
 		return
@@ -98,20 +108,81 @@ func SaveMetricFromJSON(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-func GetMetricFromJSON(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) SaveListMetricsFromJSONHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
 	var buf bytes.Buffer
 	if _, err := buf.ReadFrom(r.Body); err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
-	var metric collector.MetricJSON
+	var metrics []collector.MetricRequest
+	if err := json.Unmarshal(buf.Bytes(), &metrics); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	var results []byte
+	for _, metric := range metrics {
+
+		metricValue := ""
+		switch metric.MType {
+		case collector.Counter:
+			metricValue = strconv.Itoa(int(*metric.Delta))
+		case collector.Gauge:
+			metricValue = strconv.FormatFloat(*metric.Value, 'f', 11, 64)
+		default:
+		}
+
+		err := collector.Collector.Collect(metric, metricValue)
+		if errors.Is(err, collector.ErrBadRequest) {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		if errors.Is(err, collector.ErrNotImplemented) {
+			w.WriteHeader(http.StatusNotImplemented)
+			return
+		}
+
+		resultJSON, err := collector.Collector.GetMetricJSON(metric.ID)
+		if errors.Is(err, collector.ErrBadRequest) {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		if errors.Is(err, collector.ErrNotFound) {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		if errors.Is(err, collector.ErrNotImplemented) {
+			w.WriteHeader(http.StatusNotImplemented)
+			return
+		}
+		results = append(results, resultJSON...)
+	}
+	if _, err := w.Write(results); err != nil {
+		return
+	}
+	w.Header().Set("content-type", "application/json")
+	w.WriteHeader(http.StatusOK)
+}
+
+func (h *Handler) GetMetricFromJSONHandler(w http.ResponseWriter, r *http.Request) {
+	var buf bytes.Buffer
+	if _, err := buf.ReadFrom(r.Body); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	var metric collector.MetricRequest
 	if err := json.Unmarshal(buf.Bytes(), &metric); err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
-	resultJSON, err := collector.Collector.GetMetricJSON(metric.ID, metric.MType)
+	resultJSON, err := collector.Collector.GetMetric(metric.ID)
 	if errors.Is(err, collector.ErrBadRequest) {
 		w.WriteHeader(http.StatusBadRequest)
 		return
@@ -124,21 +195,32 @@ func GetMetricFromJSON(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNotImplemented)
 		return
 	}
+	switch metric.MType {
+	case collector.Counter:
+		metric.Delta = resultJSON.CounterValue
+	case collector.Gauge:
+		metric.Value = resultJSON.GaugeValue
+	}
+	answer, _ := json.Marshal(metric)
 
 	w.Header().Set("content-type", "application/json")
-	if _, err = w.Write(resultJSON); err != nil {
+	if _, err = w.Write(answer); err != nil {
 		return
 	}
 	w.Header().Set("content-length", strconv.Itoa(len(metric.ID)))
-	w.Header().Set("content-type", "application/json")
+	//w.Header().Set("content-type", "application/json")
 	w.WriteHeader(http.StatusOK)
 }
 
-func GetMetric(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) GetMetricHandler(w http.ResponseWriter, r *http.Request) {
 	metricType := chi.URLParam(r, "type")
 	metricName := chi.URLParam(r, "name")
 
-	value, err := collector.Collector.GetMetricByName(metricName, metricType)
+	if metricType != collector.Counter && metricType != collector.Gauge {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	value, err := collector.Collector.GetMetric(metricName)
 	if errors.Is(err, collector.ErrNotFound) {
 		w.WriteHeader(http.StatusNotFound)
 		return
@@ -149,15 +231,14 @@ func GetMetric(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusOK)
-	if _, err = io.WriteString(w, value); err != nil {
+	if _, err = io.WriteString(w, *value.TextValue); err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 	w.Header().Set("content-type", "text/plain; charset=utf-8")
-	w.Header().Set("content-length", strconv.Itoa(len(value)))
 }
 
-func ShowMetrics(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) ShowMetricsHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("content-type", "Content-Type: text/html; charset=utf-8")
 	if r.URL.Path != "/" {
 		http.Error(w, fmt.Sprintf("wrong path %q", r.URL.Path), http.StatusNotFound)
@@ -172,4 +253,34 @@ func ShowMetrics(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("content-type", "Content-Type: text/html; charset=utf-8")
+}
+
+// CheckDatabaseAvailability выполняет проверку доступности базы данных (Ping).
+func (h *Handler) CheckDatabaseAvailability(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	db, err := sql.Open("pgx", h.dbAddress)
+	if err != nil {
+		panic(err)
+	}
+	defer db.Close()
+	if err := db.PingContext(ctx); err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	} else {
+		w.WriteHeader(http.StatusOK)
+	}
+	if _, err = w.Write([]byte("pong")); err != nil {
+		return
+	}
+}
+func New(db string) *Handler {
+	return &Handler{
+		dbAddress: db,
+	}
+}
+
+type Handler struct {
+	dbAddress string
 }

@@ -14,36 +14,48 @@ import (
 
 func TestSaveMetric(t *testing.T) {
 	r := chi.NewRouter()
-	//r.Use(log.RequestLogger)
-	//r.Use(compressor.Compress)
-	r.Post("/update/{type}/{name}/{value}", SaveMetric)
-	r.Get("/value/{type}/{name}", GetMetric)
-	r.Post("/update/", SaveMetricFromJSON)
-	r.Post("/value/", GetMetricFromJSON)
-	r.Get("/", ShowMetrics)
+	h := Handler{}
+	r.Post("/update/{type}/{name}/{value}", h.SaveMetricHandler)
+	r.Get("/value/{type}/{name}", h.GetMetricHandler)
+	r.Post("/update/", h.SaveMetricFromJSONHandler)
+	r.Post("/value/", h.GetMetricFromJSONHandler)
+	r.Get("/", h.ShowMetricsHandler)
 	srv := httptest.NewServer(r)
 	defer srv.Close()
 
 	testCases := []struct {
-		name          string
-		mType         string
-		mName         string
-		mValue        string
-		expectedCode  int
-		expectedError error
+		name           string
+		mType          string
+		mName          string
+		mValue         string
+		expectedCode   int
+		expectedMetric collector.StoredMetric
+		expectedError  error
 	}{
 		{
-			name:         "case0",
-			mType:        "counter",
-			mName:        "Counter1",
-			mValue:       "15",
+			name:   "case0",
+			mType:  "counter",
+			mName:  "Counter1",
+			mValue: "15",
+			expectedMetric: collector.StoredMetric{
+				ID:           "Counter1",
+				MType:        "counter",
+				CounterValue: collector.PtrInt64(15),
+				TextValue:    collector.PtrString("15"),
+			},
 			expectedCode: http.StatusOK,
 		},
 		{
-			name:         "case1",
-			mType:        "gauge",
-			mName:        "Gauge1",
-			mValue:       "12.282",
+			name:   "case1",
+			mType:  "gauge",
+			mName:  "Gauge1",
+			mValue: "12.282",
+			expectedMetric: collector.StoredMetric{
+				ID:         "Gauge1",
+				MType:      "gauge",
+				GaugeValue: collector.PtrFloat64(12.282),
+				TextValue:  collector.PtrString("12.282"),
+			},
 			expectedCode: http.StatusOK,
 		},
 		{
@@ -52,7 +64,7 @@ func TestSaveMetric(t *testing.T) {
 			mName:         "Gauge1",
 			mValue:        "12.282",
 			expectedCode:  http.StatusNotImplemented,
-			expectedError: collector.ErrNotImplemented,
+			expectedError: collector.ErrNotFound,
 		},
 		{
 			name:          "case3",
@@ -88,14 +100,126 @@ func TestSaveMetric(t *testing.T) {
 			assert.NoError(t, err, "error making HTTP request")
 			assert.Equal(t, resp.StatusCode(), tt.expectedCode)
 
-			value, err := collector.Collector.GetMetricByName(tt.mName, tt.mType)
+			value, err := collector.Collector.GetMetric(tt.mName)
 			if err != nil {
 				assert.EqualError(t, err, tt.expectedError.Error())
 			} else {
 				assert.NoError(t, err)
 			}
 			if tt.expectedCode == http.StatusOK {
-				assert.Equal(t, value, tt.mValue)
+				assert.Equal(t, value, tt.expectedMetric)
+			}
+		})
+	}
+}
+
+func TestSaveMetricFromJSON(t *testing.T) {
+	r := chi.NewRouter()
+	h := Handler{}
+	r.Post("/update/{type}/{name}/{value}", h.SaveMetricHandler)
+	r.Get("/value/{type}/{name}", h.GetMetricHandler)
+	r.Post("/update/", h.SaveMetricFromJSONHandler)
+	r.Post("/value/", h.GetMetricFromJSONHandler)
+	r.Get("/", h.ShowMetricsHandler)
+	srv := httptest.NewServer(r)
+	defer srv.Close()
+
+	testCases := []struct {
+		name           string
+		request        collector.MetricRequest
+		expectedMetric collector.StoredMetric
+		expectedCode   int
+		expectedError  error
+	}{
+		{
+			name: "positive (counter)",
+			request: collector.MetricRequest{
+				MType: "counter",
+				ID:    "Counter15",
+				Delta: collector.PtrInt64(15),
+			},
+			expectedMetric: collector.StoredMetric{
+				MType:        "counter",
+				ID:           "Counter15",
+				CounterValue: collector.PtrInt64(15),
+				TextValue:    collector.PtrString("15"),
+			},
+			expectedCode: http.StatusOK,
+		},
+		{
+			name: "positive (gauge)",
+			request: collector.MetricRequest{
+				MType: "gauge",
+				ID:    "Gauge1",
+				Value: collector.PtrFloat64(12.282),
+			},
+			expectedMetric: collector.StoredMetric{
+				MType:      "gauge",
+				ID:         "Gauge1",
+				GaugeValue: collector.PtrFloat64(12.282),
+				TextValue:  collector.PtrString("12.28200000000"),
+			},
+			expectedCode: http.StatusOK,
+		},
+		{
+			name: "negative (invalid type)",
+			request: collector.MetricRequest{
+				MType: "invalid",
+				ID:    "Gauge1",
+				Value: collector.PtrFloat64(12.282),
+			},
+			expectedMetric: collector.StoredMetric{},
+			expectedCode:   http.StatusNotImplemented,
+			expectedError:  collector.ErrNotImplemented,
+		},
+		{
+			name: "negative (invalid name)",
+			request: collector.MetricRequest{
+				MType: "gauge",
+				ID:    "",
+				Value: collector.PtrFloat64(1),
+			},
+			expectedCode:  http.StatusBadRequest,
+			expectedError: collector.ErrNotFound,
+		},
+		{
+			name: "negative (invalid gauge value)",
+			request: collector.MetricRequest{
+				MType: "gauge",
+				ID:    "invalidGauge",
+				Value: collector.PtrFloat64(-1.9),
+			},
+			expectedCode:  http.StatusBadRequest,
+			expectedError: collector.ErrNotFound,
+		},
+	}
+	for _, tt := range testCases {
+
+		t.Run(tt.name, func(t *testing.T) {
+			resBody, err := json.Marshal(tt.request)
+			assert.NoError(t, err)
+			resp, err := resty.New().R().
+				SetHeader("Content-Type", "text/plain").
+				SetBody(resBody).
+				Post(fmt.Sprintf("%s/update/", srv.URL))
+
+			assert.NoError(t, err, "error making HTTP request")
+			assert.Equal(t, resp.StatusCode(), tt.expectedCode)
+
+			value, err := collector.Collector.GetMetricJSON(tt.request.ID)
+			if err != nil {
+				assert.EqualError(t, err, tt.expectedError.Error())
+			} else {
+				assert.NoError(t, err)
+			}
+			actual := collector.StoredMetric{}
+			err = json.Unmarshal(value, &actual)
+			if err != nil {
+				return
+			}
+
+			if tt.expectedCode == http.StatusOK {
+				assert.Equal(t, actual, tt.expectedMetric)
 			}
 		})
 	}
@@ -103,8 +227,9 @@ func TestSaveMetric(t *testing.T) {
 
 func TestGetMetric(t *testing.T) {
 	r := chi.NewRouter()
-	r.Post("/update/{type}/{name}/{value}", SaveMetric)
-	r.Get("/value/{type}/{name}", GetMetric)
+	h := Handler{}
+	r.Post("/update/{type}/{name}/{value}", h.SaveMetricHandler)
+	r.Get("/value/{type}/{name}", h.GetMetricHandler)
 	srv := httptest.NewServer(r)
 	defer srv.Close()
 
@@ -177,11 +302,11 @@ func TestGetMetric(t *testing.T) {
 			expectedCode: http.StatusNotFound,
 		},
 		{
-			name:         "case5",
+			name:         "case6",
 			mType:        "invalid",
 			mName:        "Gauge4",
 			mValue:       "",
-			expectedCode: http.StatusNotImplemented,
+			expectedCode: http.StatusBadRequest,
 		},
 	}
 	for _, tt := range testCases {
@@ -199,8 +324,9 @@ func TestGetMetric(t *testing.T) {
 
 func TestGetMetricFromJSON(t *testing.T) {
 	r := chi.NewRouter()
-	r.Post("/update/{type}/{name}/{value}", SaveMetric)
-	r.Post("/value/", GetMetricFromJSON)
+	h := Handler{}
+	r.Post("/update/{type}/{name}/{value}", h.SaveMetricHandler)
+	r.Post("/value/", h.GetMetricFromJSONHandler)
 	srv := httptest.NewServer(r)
 	defer srv.Close()
 
@@ -269,7 +395,7 @@ func TestGetMetricFromJSON(t *testing.T) {
 	}
 	for _, tt := range testCases {
 		t.Run(tt.name, func(t *testing.T) {
-			body := collector.MetricJSON{
+			body := collector.MetricRequest{
 				ID:    tt.mName,
 				MType: tt.mType,
 			}
@@ -288,8 +414,9 @@ func TestGetMetricFromJSON(t *testing.T) {
 
 func TestShowMetrics(t *testing.T) {
 	r := chi.NewRouter()
-	r.Post("/update/{type}/{name}/{value}", SaveMetric)
-	r.Get("/", ShowMetrics)
+	h := Handler{}
+	r.Post("/update/{type}/{name}/{value}", h.SaveMetricHandler)
+	r.Get("/", h.ShowMetricsHandler)
 	srv := httptest.NewServer(r)
 	defer srv.Close()
 

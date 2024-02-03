@@ -1,11 +1,8 @@
 package collector
 
 import (
-	"bufio"
 	"encoding/json"
 	"errors"
-	"fmt"
-	"os"
 	"strconv"
 )
 
@@ -20,180 +17,110 @@ var (
 
 // Collector Определен экземпляр структуры collector с именем Collector
 var Collector = collector{
-	storage: &memStorage{
-		Counters: make(map[string]int),
-		Gauges:   make(map[string]string),
-	},
+	Metrics: make([]StoredMetric, 0),
 }
 
 // Collect добавляет собранную метрику в коллектор
-func (c *collector) Collect(metricName string, metricType string, metricValue string) error {
-	switch metricType {
-	case "counter":
+func (c *collector) Collect(metric MetricRequest, metricValue string) error {
+	if (metric.Delta != nil && *metric.Delta < 0) || (metric.Value != nil && *metric.Value < 0) || metric.ID == "" {
+		return ErrBadRequest
+	}
+
+	switch metric.MType {
+	case Counter:
+		v, err := c.GetMetric(metric.ID)
+		if err != nil {
+			if !errors.Is(err, ErrNotFound) {
+				return err
+			}
+		}
 		value, err := strconv.Atoi(metricValue)
 		if err != nil {
 			return ErrBadRequest
 		}
-		c.storage.Counters[metricName] += value
-	case "gauge":
-		_, err := strconv.ParseFloat(metricValue, 64)
+		if v.CounterValue != nil {
+			value = value + int(*v.CounterValue)
+		}
+		metricToStore := StoredMetric{
+			ID:           metric.ID,
+			MType:        metric.MType,
+			CounterValue: PtrInt64(int64(value)),
+			TextValue:    PtrString(strconv.Itoa(value)),
+		}
+		c.UpsertMetric(metricToStore)
+	case Gauge:
+		value, err := strconv.ParseFloat(metricValue, 64)
 		if err != nil {
 			return ErrBadRequest
 		}
-		c.storage.Gauges[metricName] = metricValue
+		metricToStore := StoredMetric{
+			ID:         metric.ID,
+			MType:      metric.MType,
+			GaugeValue: &value,
+			TextValue:  &metricValue,
+		}
+		c.UpsertMetric(metricToStore)
 	default:
 		return ErrNotImplemented
 	}
 	return nil
 }
-func (c *collector) Restore(filePath string) error {
-	file, err := os.OpenFile(filePath, os.O_RDONLY|os.O_CREATE, 0666)
-	if err != nil {
-		return err
-	}
-	scanner := bufio.NewScanner(file)
-	if !scanner.Scan() {
-		return err
-	}
-	data := scanner.Bytes()
-	metricsFromFile := memStorage{}
-	if err = json.Unmarshal(data, &metricsFromFile); err != nil {
-		return err
-	}
-	c.decode(metricsFromFile)
-	return nil
-}
 
-func (c *collector) Save(filePath string) error {
-	var saveError error
-	file, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE, 0666)
-	if err != nil {
-		return err
-	}
-	defer func() {
-		if closeErr := file.Close(); closeErr != nil && saveError == nil {
-			saveError = closeErr
+func (c *collector) GetMetricJSON(metricName string) ([]byte, error) {
+	for _, m := range c.Metrics {
+		if m.ID == metricName {
+			resultJSON, err := json.Marshal(m)
+			if err != nil {
+				return nil, ErrBadRequest
+			}
+			return resultJSON, nil
 		}
-	}()
-
-	writer := bufio.NewWriter(file)
-	metricsData := c.encode()
-	data, err := json.Marshal(&metricsData)
-	if err != nil {
-		return err
 	}
-	if _, err := writer.Write(data); err != nil {
-		return err
-	}
-	if err := writer.WriteByte('\n'); err != nil {
-		return err
-	}
-	if err := writer.Flush(); err != nil {
-		return err
-	}
-	return saveError
+	return nil, ErrNotFound
 }
 
-func (c *collector) CollectFromJSON(metric MetricJSON) error {
-	metricValue := ""
-	switch metric.MType {
-	case "counter":
-		metricValue = strconv.Itoa(int(*metric.Delta))
-	case "gauge":
-		metricValue = fmt.Sprintf("%.11f", *metric.Value)
-	}
-
-	return c.Collect(metric.ID, metric.MType, metricValue)
-}
-
-func (c *collector) GetMetricJSON(metricName, metricType string) ([]byte, error) {
-	updated, err := c.GetMetricByName(metricName, metricType)
-	if err != nil {
-		return nil, err
-	}
-
-	result := MetricJSON{
-		ID:    metricName,
-		MType: metricType,
-	}
-	switch result.MType {
-	case "counter":
-		counter, err := strconv.Atoi(updated)
-		if err != nil {
-			return nil, ErrBadRequest
+// GetMetric возвращает значение заданной метрики по имени метрики
+func (c *collector) GetMetric(metricName string) (StoredMetric, error) {
+	for _, m := range c.Metrics {
+		if m.ID == metricName {
+			return m, nil
 		}
-		c64 := int64(counter)
-		result.Delta = &c64
-	case "gauge":
-		g, err := strconv.ParseFloat(updated, 64)
-		if err != nil {
-			return nil, ErrBadRequest
-		}
-		result.Value = &g
 	}
-
-	resultJSON, err := json.Marshal(result)
-	if err != nil {
-		return nil, ErrBadRequest
-	}
-	return resultJSON, nil
-}
-
-// GetMetricByName возвращает значение заданной метрики по имени метрики
-func (c *collector) GetMetricByName(metricName string, metricType string) (string, error) {
-	switch metricType {
-	case "counter":
-		value, ok := Collector.storage.Counters[metricName]
-		if !ok {
-			return "", ErrNotFound
-		}
-		return strconv.Itoa(value), nil
-	case "gauge":
-		value, ok := Collector.storage.Gauges[metricName]
-		if !ok {
-			return "", ErrNotFound
-		}
-		return value, nil
-	default:
-		return "", ErrNotImplemented
-	}
-}
-
-// GetCounters возвращает все счетчики метрик
-func (c *collector) GetCounters() map[string]string {
-	counters := make(map[string]string, 0)
-	for name, value := range c.storage.Counters {
-		counters[name] = strconv.Itoa(value)
-	}
-	return counters
-}
-
-// GetGauges возвращает показатели метрик
-func (c *collector) GetGauges() map[string]string {
-	gauges := make(map[string]string, 0)
-	for name, value := range c.storage.Gauges {
-		gauges[name] = value
-	}
-	return gauges
+	return StoredMetric{}, ErrNotFound
 }
 
 // GetAvailableMetrics Метод возвращает слайс с доступными метриками.
 // Внутри метода перебираются элементы счетчиков и показателей в объекте "storage" и добавляются в срез.
 func (c *collector) GetAvailableMetrics() []string {
 	names := make([]string, 0)
-	for cm := range c.storage.Counters {
-		names = append(names, cm)
-	}
-	for gm := range c.storage.Gauges {
-		names = append(names, gm)
+	for _, m := range c.Metrics {
+		names = append(names, m.ID)
 	}
 	return names
 }
 
-func (c *collector) encode() memStorage {
-	return *c.storage
+// UpsertMetric добавляет или обновляет метрику в коллекторе.
+func (c *collector) UpsertMetric(metric StoredMetric) {
+	for i, m := range c.Metrics {
+		if m.ID == metric.ID {
+			c.Metrics[i] = metric
+			return
+		}
+	}
+	c.Metrics = append(c.Metrics, metric)
 }
 
-func (c *collector) decode(encoded memStorage) {
-	c.storage = &encoded
+// PtrFloat64 создает указатель на float64 с заданным значением.
+func PtrFloat64(f float64) *float64 {
+	return &f
+}
+
+// PtrInt64 создает указатель на int64 с заданным значением.
+func PtrInt64(i int64) *int64 {
+	return &i
+}
+
+// PtrString создает указатель на строку с заданным значением.
+func PtrString(s string) *string {
+	return &s
 }

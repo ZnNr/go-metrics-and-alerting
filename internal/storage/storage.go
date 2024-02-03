@@ -1,7 +1,6 @@
 package storage
 
 import (
-	"fmt"
 	"github.com/ZnNr/go-musthave-metrics.git/internal/collector"
 	"math/rand"
 	"runtime"
@@ -9,43 +8,46 @@ import (
 )
 
 // Store функуия используется для сбора метрик и сохранения их в хранилище.
-func (a *Storage) Store() {
+func (st *Storage) Store() {
 	metrics := runtime.MemStats{}  //создается переменная metrics типа runtime.MemStats, которая представляет собой статистику памяти
 	runtime.ReadMemStats(&metrics) //вызывается функциякоторая заполняет структуру metrics актуальными данными о памяти.
-	//Происходит вызов метода Collect() объекта a.metricsCollector для каждого из собранных показателей памяти.
+	//Происходит вызов метода Collect() объекта st.metricsCollector для каждого из собранных показателей памяти.
 	//Каждый вызов передает имя метрики, тип и значение метрики, преобразованное в строку.
-	a.metricsCollector.Collect("Alloc", "gauge", strconv.FormatUint(metrics.Alloc, 10)) //собирает метрику "Alloc" и передает ее в хранилище. Значение метрики образуется из поля metrics.Alloc, которое представляет количество выделенной памяти для объектов Go
-	a.metricsCollector.Collect("BuckHashSys", "gauge", strconv.FormatUint(metrics.BuckHashSys, 10))
-	a.metricsCollector.Collect("Frees", "gauge", strconv.FormatUint(metrics.Frees, 10))
-	a.metricsCollector.Collect("GCCPUFraction", "gauge", fmt.Sprintf("%.3f", metrics.GCCPUFraction))
-	a.metricsCollector.Collect("GCSys", "gauge", strconv.FormatUint(metrics.GCSys, 10))
-	a.metricsCollector.Collect("HeapAlloc", "gauge", strconv.FormatUint(metrics.HeapAlloc, 10))
-	a.metricsCollector.Collect("HeapIdle", "gauge", strconv.FormatUint(metrics.HeapIdle, 10))
-	a.metricsCollector.Collect("HeapInuse", "gauge", strconv.FormatUint(metrics.HeapInuse, 10))
-	a.metricsCollector.Collect("HeapObjects", "gauge", strconv.FormatUint(metrics.HeapObjects, 10))
-	a.metricsCollector.Collect("HeapReleased", "gauge", strconv.FormatUint(metrics.HeapReleased, 10))
-	a.metricsCollector.Collect("HeapSys", "gauge", strconv.FormatUint(metrics.HeapSys, 10))
-	a.metricsCollector.Collect("LastGC", "gauge", strconv.Itoa(int(metrics.LastGC)))
-	a.metricsCollector.Collect("Lookups", "gauge", strconv.FormatUint(metrics.Lookups, 10))
-	a.metricsCollector.Collect("MCacheInuse", "gauge", strconv.FormatUint(metrics.MCacheInuse, 10))
-	a.metricsCollector.Collect("MCacheSys", "gauge", strconv.FormatUint(metrics.MCacheSys, 10))
-	a.metricsCollector.Collect("MSpanInuse", "gauge", strconv.FormatUint(metrics.MSpanInuse, 10))
-	a.metricsCollector.Collect("MSpanSys", "gauge", strconv.FormatUint(metrics.MSpanSys, 10))
-	a.metricsCollector.Collect("Mallocs", "gauge", strconv.FormatUint(metrics.Mallocs, 10))
-	a.metricsCollector.Collect("NextGC", "gauge", strconv.FormatUint(metrics.NextGC, 10))
-	a.metricsCollector.Collect("NumForcedGC", "gauge", strconv.Itoa(int(metrics.NumForcedGC)))
-	a.metricsCollector.Collect("NumGC", "gauge", strconv.FormatUint(uint64(metrics.NumGC), 10))
-	a.metricsCollector.Collect("OtherSys", "gauge", strconv.Itoa(int(metrics.OtherSys)))
-	a.metricsCollector.Collect("PauseTotalNs", "gauge", strconv.Itoa(int(metrics.PauseTotalNs)))
-	a.metricsCollector.Collect("StackInuse", "gauge", strconv.Itoa(int(metrics.StackInuse)))
-	a.metricsCollector.Collect("StackSys", "gauge", strconv.Itoa(int(metrics.StackSys)))
-	a.metricsCollector.Collect("Sys", "gauge", strconv.Itoa(int(metrics.Sys)))
-	a.metricsCollector.Collect("TotalAlloc", "gauge", strconv.Itoa(int(metrics.TotalAlloc)))
-	a.metricsCollector.Collect("RandomValue", "gauge", strconv.Itoa(rand.Int()))
+	st.metricsCollector.UpsertMetric(collector.StoredMetric{ID: "Alloc", MType: "gauge", GaugeValue: collector.PtrFloat64(float64(metrics.Alloc)), TextValue: collector.PtrString(strconv.FormatFloat(float64(metrics.Alloc), 'f', 11, 64))})
+	st.metricsCollector.UpsertMetric(collector.StoredMetric{ID: "BuckHashSys", MType: "gauge", GaugeValue: collector.PtrFloat64(float64(metrics.BuckHashSys)), TextValue: collector.PtrString(strconv.FormatFloat(float64(metrics.BuckHashSys), 'f', 11, 64))})
+	st.metricsCollector.UpsertMetric(collector.StoredMetric{ID: "Frees", MType: "gauge", GaugeValue: collector.PtrFloat64(float64(metrics.Frees)), TextValue: collector.PtrString(strconv.FormatFloat(float64(metrics.Frees), 'f', 11, 64))})
+	st.metricsCollector.UpsertMetric(collector.StoredMetric{ID: "GCCPUFraction", MType: "gauge", GaugeValue: &metrics.GCCPUFraction, TextValue: collector.PtrString(strconv.FormatFloat(metrics.GCCPUFraction, 'f', 11, 64))})
+	st.metricsCollector.UpsertMetric(collector.StoredMetric{ID: "GCSys", MType: "gauge", GaugeValue: collector.PtrFloat64(float64(metrics.GCSys)), TextValue: collector.PtrString(strconv.FormatFloat(float64(metrics.GCSys), 'f', 11, 64))})
+	st.metricsCollector.UpsertMetric(collector.StoredMetric{ID: "HeapAlloc", MType: "gauge", GaugeValue: collector.PtrFloat64(float64(metrics.HeapAlloc)), TextValue: collector.PtrString(strconv.FormatFloat(float64(metrics.HeapAlloc), 'f', 11, 64))})
+	st.metricsCollector.UpsertMetric(collector.StoredMetric{ID: "HeapIdle", MType: "gauge", GaugeValue: collector.PtrFloat64(float64(metrics.HeapIdle)), TextValue: collector.PtrString(strconv.FormatFloat(float64(metrics.HeapIdle), 'f', 11, 64))})
+	st.metricsCollector.UpsertMetric(collector.StoredMetric{ID: "HeapInuse", MType: "gauge", GaugeValue: collector.PtrFloat64(float64(metrics.HeapInuse)), TextValue: collector.PtrString(strconv.FormatFloat(float64(metrics.HeapInuse), 'f', 11, 64))})
+	st.metricsCollector.UpsertMetric(collector.StoredMetric{ID: "HeapObjects", MType: "gauge", GaugeValue: collector.PtrFloat64(float64(metrics.HeapObjects)), TextValue: collector.PtrString(strconv.FormatFloat(float64(metrics.HeapObjects), 'f', 11, 64))})
+	st.metricsCollector.UpsertMetric(collector.StoredMetric{ID: "HeapReleased", MType: "gauge", GaugeValue: collector.PtrFloat64(float64(metrics.HeapReleased)), TextValue: collector.PtrString(strconv.FormatFloat(float64(metrics.HeapReleased), 'f', 11, 64))})
+	st.metricsCollector.UpsertMetric(collector.StoredMetric{ID: "HeapSys", MType: "gauge", GaugeValue: collector.PtrFloat64(float64(metrics.HeapSys)), TextValue: collector.PtrString(strconv.FormatFloat(float64(metrics.HeapSys), 'f', 11, 64))})
+	st.metricsCollector.UpsertMetric(collector.StoredMetric{ID: "Lookups", MType: "gauge", GaugeValue: collector.PtrFloat64(float64(metrics.Lookups)), TextValue: collector.PtrString(strconv.FormatFloat(float64(metrics.Lookups), 'f', 11, 64))})
+	st.metricsCollector.UpsertMetric(collector.StoredMetric{ID: "MCacheInuse", MType: "gauge", GaugeValue: collector.PtrFloat64(float64(metrics.MCacheInuse)), TextValue: collector.PtrString(strconv.FormatFloat(float64(metrics.MCacheInuse), 'f', 11, 64))})
+	st.metricsCollector.UpsertMetric(collector.StoredMetric{ID: "MCacheSys", MType: "gauge", GaugeValue: collector.PtrFloat64(float64(metrics.MCacheSys)), TextValue: collector.PtrString(strconv.FormatFloat(float64(metrics.MCacheSys), 'f', 11, 64))})
+	st.metricsCollector.UpsertMetric(collector.StoredMetric{ID: "MSpanInuse", MType: "gauge", GaugeValue: collector.PtrFloat64(float64(metrics.MSpanInuse)), TextValue: collector.PtrString(strconv.FormatFloat(float64(metrics.MSpanInuse), 'f', 11, 64))})
+	st.metricsCollector.UpsertMetric(collector.StoredMetric{ID: "MSpanSys", MType: "gauge", GaugeValue: collector.PtrFloat64(float64(metrics.MSpanSys)), TextValue: collector.PtrString(strconv.FormatFloat(float64(metrics.MSpanSys), 'f', 11, 64))})
+	st.metricsCollector.UpsertMetric(collector.StoredMetric{ID: "Mallocs", MType: "gauge", GaugeValue: collector.PtrFloat64(float64(metrics.Mallocs)), TextValue: collector.PtrString(strconv.FormatFloat(float64(metrics.Mallocs), 'f', 11, 64))})
+	st.metricsCollector.UpsertMetric(collector.StoredMetric{ID: "NextGC", MType: "gauge", GaugeValue: collector.PtrFloat64(float64(metrics.NextGC)), TextValue: collector.PtrString(strconv.FormatFloat(float64(metrics.NextGC), 'f', 11, 64))})
+	st.metricsCollector.UpsertMetric(collector.StoredMetric{ID: "NumForcedGC", MType: "gauge", GaugeValue: collector.PtrFloat64(float64(metrics.NumForcedGC)), TextValue: collector.PtrString(strconv.FormatFloat(float64(metrics.NumForcedGC), 'f', 11, 64))})
+	st.metricsCollector.UpsertMetric(collector.StoredMetric{ID: "NumGC", MType: "gauge", GaugeValue: collector.PtrFloat64(float64(metrics.NumGC)), TextValue: collector.PtrString(strconv.FormatFloat(float64(metrics.NumGC), 'f', 11, 64))})
+	st.metricsCollector.UpsertMetric(collector.StoredMetric{ID: "OtherSys", MType: "gauge", GaugeValue: collector.PtrFloat64(float64(metrics.OtherSys)), TextValue: collector.PtrString(strconv.FormatFloat(float64(metrics.OtherSys), 'f', 11, 64))})
+	st.metricsCollector.UpsertMetric(collector.StoredMetric{ID: "PauseTotalNs", MType: "gauge", GaugeValue: collector.PtrFloat64(float64(metrics.PauseTotalNs)), TextValue: collector.PtrString(strconv.FormatFloat(float64(metrics.PauseTotalNs), 'f', 11, 64))})
+	st.metricsCollector.UpsertMetric(collector.StoredMetric{ID: "StackInuse", MType: "gauge", GaugeValue: collector.PtrFloat64(float64(metrics.StackInuse)), TextValue: collector.PtrString(strconv.FormatFloat(float64(metrics.StackInuse), 'f', 11, 64))})
+	st.metricsCollector.UpsertMetric(collector.StoredMetric{ID: "StackSys", MType: "gauge", GaugeValue: collector.PtrFloat64(float64(metrics.StackSys)), TextValue: collector.PtrString(strconv.FormatFloat(float64(metrics.StackSys), 'f', 11, 64))})
+	st.metricsCollector.UpsertMetric(collector.StoredMetric{ID: "Sys", MType: "gauge", GaugeValue: collector.PtrFloat64(float64(metrics.Sys)), TextValue: collector.PtrString(strconv.FormatFloat(float64(metrics.Sys), 'f', 11, 64))})
+	st.metricsCollector.UpsertMetric(collector.StoredMetric{ID: "TotalAlloc", MType: "gauge", GaugeValue: collector.PtrFloat64(float64(metrics.TotalAlloc)), TextValue: collector.PtrString(strconv.FormatFloat(float64(metrics.TotalAlloc), 'f', 11, 64))})
+	st.metricsCollector.UpsertMetric(collector.StoredMetric{ID: "RandomValue", MType: "gauge", GaugeValue: collector.PtrFloat64(float64(rand.Int())), TextValue: collector.PtrString(strconv.FormatFloat(float64(rand.Int()), 'f', 11, 64))})
+	st.metricsCollector.UpsertMetric(collector.StoredMetric{ID: "LastGC", MType: "gauge", GaugeValue: collector.PtrFloat64(float64(metrics.LastGC)), TextValue: collector.PtrString(strconv.FormatFloat(float64(metrics.LastGC), 'f', 11, 64))})
 
-	cnt, _ := collector.Collector.GetMetricByName("PollCount", "counter")
-	v, _ := strconv.Atoi(cnt)
-	collector.Collector.Collect("PollCount", "counter", strconv.Itoa(v+1))
+	cnt, _ := st.metricsCollector.GetMetric("PollCount")
+	counter := int64(0)
+	if cnt.CounterValue != nil {
+		counter = *cnt.CounterValue + 1
+	}
+	st.metricsCollector.UpsertMetric(collector.StoredMetric{ID: "PollCount", MType: "counter", CounterValue: collector.PtrInt64(counter), TextValue: collector.PtrString(strconv.Itoa(int(counter)))})
 }
 
 // New - это конструктор, который создает и возвращает новый экземпляр структуры storage.
@@ -65,5 +67,6 @@ type Storage struct {
 
 // Интерфейс collectorImpl определяет только один метод Collect, который принимает три аргумента: metricName (имя метрики), metricType (тип метрики) и metricValue (значение метрики), и возвращает ошибку
 type collectorImpl interface {
-	Collect(metricName string, metricType string, metricValue string) error
+	UpsertMetric(metric collector.StoredMetric)
+	GetMetric(metricName string) (collector.StoredMetric, error)
 }

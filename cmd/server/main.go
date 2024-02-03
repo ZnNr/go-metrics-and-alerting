@@ -1,20 +1,21 @@
 package main
 
 import (
+	"context"
 	"github.com/ZnNr/go-musthave-metrics.git/internal/collector"
-	"github.com/ZnNr/go-musthave-metrics.git/internal/compressor"
 	"github.com/ZnNr/go-musthave-metrics.git/internal/flags"
-	"github.com/ZnNr/go-musthave-metrics.git/internal/handlers"
 	log "github.com/ZnNr/go-musthave-metrics.git/internal/logger"
-	"github.com/go-chi/chi/v5"
+	"github.com/ZnNr/go-musthave-metrics.git/internal/router"
+	"github.com/ZnNr/go-musthave-metrics.git/internal/saver/database"
+	"github.com/ZnNr/go-musthave-metrics.git/internal/saver/file"
 	"go.uber.org/zap"
 	"net/http"
 	"time"
 )
 
 func main() {
-	logger, err := zap.NewDevelopment() // добавляем предустановленный логер NewDevelopment
-	if err != nil {                     // вызываем панику, если ошибка
+	logger, err := zap.NewDevelopment()
+	if err != nil {
 		panic(err)
 	}
 	defer logger.Sync()
@@ -26,42 +27,66 @@ func main() {
 		flags.WithStoreInterval(),
 		flags.WithFileStoragePath(),
 		flags.WithRestore(),
+		flags.WithDatabase(),
 	)
 
-	r := chi.NewRouter()
-	r.Use(log.RequestLogger)
-	r.Use(compressor.Compress)
-	r.Post("/update/", handlers.SaveMetricFromJSON)
-	r.Post("/value/", handlers.GetMetricFromJSON)
-	r.Post("/update/{type}/{name}/{value}", handlers.SaveMetric)
-	r.Get("/value/{type}/{name}", handlers.GetMetric)
-	r.Get("/", handlers.ShowMetrics)
+	r := router.New(*params)
+
 	log.SugarLogger.Infow(
 		"Starting server",
 		"addr", params.FlagRunAddr,
 	)
-
-	if params.Restore {
-		if err := collector.Collector.Restore(params.FileStoragePath); err != nil {
-			log.SugarLogger.Error(err.Error(), "restore error")
+	// Инициализация ресторера
+	// инициализация переменной saver типа saver, которая будет использоваться для восстановления и сохранения метрик.
+	var saver saver
+	if params.FileStoragePath != "" && params.DatabaseAddress == "" {
+		saver = file.New(params)
+	} else if params.DatabaseAddress != "" {
+		saver, err = database.New(params)
+		if err != nil {
+			log.SugarLogger.Errorf(err.Error())
 		}
 	}
-	if params.FileStoragePath != "" {
-		go saveMetrics(params.FileStoragePath, params.StoreInterval)
+
+	// востановление предыдущих метрик
+	ctx := context.Background()
+	if params.Restore && (params.FileStoragePath != "" || params.DatabaseAddress != "") {
+		metrics, err := saver.Restore(ctx)
+		if err != nil {
+			log.SugarLogger.Error(err.Error(), "restore error")
+		}
+		collector.Collector.Metrics = metrics
+		log.SugarLogger.Info("metrics restored")
 	}
 
+	// востановление метрик
+	if params.DatabaseAddress != "" || params.FileStoragePath != "" {
+		go saveMetrics(ctx, saver, params.StoreInterval)
+	}
+
+	// запуск сервера
 	if err := http.ListenAndServe(params.FlagRunAddr, r); err != nil {
-		// записываем в лог ошибку, если сервер не запустился
 		log.SugarLogger.Fatalw(err.Error(), "event", "start server")
 	}
 }
-func saveMetrics(path string, interval int) {
+
+// saveMetrics — горутина, которая периодически сохраняет метрики
+func saveMetrics(ctx context.Context, saver saver, interval int) {
+	ticker := time.NewTicker(time.Duration(interval))
 	for {
-		if err := collector.Collector.Save(path); err != nil {
-			log.SugarLogger.Error(err.Error(), "save error")
-		} else {
-			log.SugarLogger.Info("successfully saved metrics")
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			if err := saver.Save(ctx, collector.Collector.Metrics); err != nil {
+				log.SugarLogger.Error(err.Error(), "save error")
+			}
 		}
-		time.Sleep(time.Duration(interval) * time.Second)
 	}
+}
+
+// saver — интерфейс, определяющий методы восстановления и сохранения метрик.
+type saver interface {
+	Restore(ctx context.Context) ([]collector.StoredMetric, error)
+	Save(ctx context.Context, metrics []collector.StoredMetric) error
 }
