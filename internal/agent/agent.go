@@ -12,12 +12,13 @@ import (
 	"github.com/ZnNr/go-musthave-metrics.git/internal/storage"
 	"github.com/avast/retry-go"
 	"github.com/go-resty/resty/v2"
+	"go.uber.org/zap"
 	"log"
 	"time"
 )
 
 func (a *Agent) CollectMetrics(ctx context.Context) (err error) {
-	aggTicker := time.NewTicker(time.Duration(a.params.PollInterval) * time.Second)
+	storeTicker := time.NewTicker(time.Duration(a.params.PollInterval) * time.Second)
 	//var err error
 
 	go func() {
@@ -26,19 +27,7 @@ func (a *Agent) CollectMetrics(ctx context.Context) (err error) {
 			case <-ctx.Done():
 				err = ctx.Err()
 				return
-			case <-aggTicker.C:
-				a.storage.Store()
-			}
-		}
-	}()
-
-	go func() {
-		for {
-			select {
-			case <-ctx.Done():
-				err = ctx.Err()
-				return
-			case <-aggTicker.C:
+			case <-storeTicker.C:
 				a.storage.Store()
 			}
 		}
@@ -112,14 +101,16 @@ func (a *Agent) sendRequestsWithRetries(req *resty.Request, jsonInput string) er
 	return nil
 }
 
-func New(params *flags.Params, storage *storage.Storage) *Agent {
+func New(params *flags.Params, storage *storage.Storage, log zap.SugaredLogger) *Agent {
 	return &Agent{
 		params:  params,
 		storage: storage,
+		log:     log,
 	}
 }
 
 type Agent struct {
 	params  *flags.Params
 	storage *storage.Storage
+	log     zap.SugaredLogger
 }

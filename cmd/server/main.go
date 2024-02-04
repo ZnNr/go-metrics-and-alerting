@@ -10,13 +10,13 @@ import (
 	"github.com/ZnNr/go-musthave-metrics.git/internal/saver/file"
 	"go.uber.org/zap"
 	"net/http"
-	"time"
+	"os"
 )
 
 func main() {
 	logger, err := zap.NewDevelopment()
 	if err != nil {
-		panic(err)
+		os.Exit(1)
 	}
 	defer logger.Sync()
 
@@ -26,13 +26,17 @@ func main() {
 		flags.WithAddr(),
 		flags.WithStoreInterval(),
 		flags.WithFileStoragePath(),
-		flags.WithRestore(), flags.WithDatabase(),
+		flags.WithRestore(),
+		flags.WithDatabase(),
 		flags.WithKey(),
 	)
 
 	r := router.New(*params)
 
-	log.SugarLogger.Infow("Starting server", "addr", params.FlagRunAddr)
+	log.SugarLogger.Infow(
+		"Starting server",
+		"addr",
+		params.FlagRunAddr)
 	// Инициализация ресторера
 	// инициализация переменной saver типа saver, которая будет использоваться для восстановления и сохранения метрик.
 	var saver saver
@@ -69,15 +73,9 @@ func main() {
 
 // saveMetrics — горутина, которая периодически сохраняет метрики
 func saveMetrics(ctx context.Context, saver saver, interval int) {
-	ticker := time.NewTicker(time.Duration(interval))
 	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-ticker.C:
-			if err := saver.Save(ctx, collector.Collector.Metrics); err != nil {
-				log.SugarLogger.Error(err.Error(), "save error")
-			}
+		if err := saver.Save(ctx, collector.Collector.Metrics); err != nil {
+			log.SugarLogger.Error(err.Error(), "save error")
 		}
 	}
 }

@@ -62,18 +62,9 @@ func (h *Handler) SaveMetricFromJSONHandler(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	gotHash := r.Header.Get("HashSHA256")
-	want := h.getHash(buf.Bytes())
-	if gotHash != "" {
-		w.Header().Set("HashSHA256", want)
-	}
-
-	if !h.checkSubscription(want, gotHash) {
+	if !h.checkSubscription(w, buf, r.Header.Get("HashSHA256")) {
 		w.WriteHeader(http.StatusBadRequest)
 		return
-	}
-	if gotHash != "" {
-		w.Header().Set("HashSHA256", gotHash)
 	}
 
 	var metric collector.MetricRequest
@@ -140,13 +131,7 @@ func (h *Handler) SaveListMetricsFromJSONHandler(w http.ResponseWriter, r *http.
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	gotHash := r.Header.Get("HashSHA256")
-	want := h.getHash(buf.Bytes())
-	if gotHash != "" {
-		w.Header().Set("HashSHA256", want)
-	}
-
-	if !h.checkSubscription(want, gotHash) {
+	if !h.checkSubscription(w, buf, r.Header.Get("HashSHA256")) {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
@@ -202,13 +187,7 @@ func (h *Handler) GetMetricFromJSONHandler(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	gotHash := r.Header.Get("HashSHA256")
-	want := h.getHash(buf.Bytes())
-	if gotHash != "" {
-		w.Header().Set("HashSHA256", want)
-	}
-
-	if !h.checkSubscription(want, gotHash) {
+	if !h.checkSubscription(w, buf, r.Header.Get("HashSHA256")) {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
@@ -300,7 +279,8 @@ func (h *Handler) CheckDatabaseAvailability(w http.ResponseWriter, r *http.Reque
 
 	db, err := sql.Open("pgx", h.dbAddress)
 	if err != nil {
-		panic(err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
 	}
 	defer db.Close()
 	if err := db.PingContext(ctx); err != nil {
@@ -313,7 +293,12 @@ func (h *Handler) CheckDatabaseAvailability(w http.ResponseWriter, r *http.Reque
 		return
 	}
 }
-func (h *Handler) checkSubscription(want, header string) bool {
+
+func (h *Handler) checkSubscription(w http.ResponseWriter, buf bytes.Buffer, header string) bool {
+	want := h.getHash(buf.Bytes())
+	if header != "" {
+		w.Header().Set("HashSHA256", want)
+	}
 	if h.key != "" && len(want) != 0 && header != "" {
 		//h := hmac.New(sha256.New, []byte(h.key))
 		//h.Write(body)
@@ -323,20 +308,6 @@ func (h *Handler) checkSubscription(want, header string) bool {
 	}
 	return true
 }
-
-//func funcGotHash(w http.ResponseWriter, r *http.Request, h *Handler, buf bytes.Buffer) bool {
-//	gotHash := r.Header.Get("HashSHA256")
-//	want := h.getHash(buf.Bytes())
-//	if gotHash != "" {
-//		w.Header().Set("HashSHA256", h.getHash(buf.Bytes()))
-//	}
-//	if !h.checkSubscription(want, gotHash) {
-//		w.WriteHeader(http.StatusBadRequest)
-//		return true
-//	}
-//	return false
-//
-//}
 
 func (h *Handler) getHash(body []byte) string {
 	want := sha256.Sum256(body)
