@@ -140,7 +140,14 @@ func (h *Handler) SaveListMetricsFromJSONHandler(w http.ResponseWriter, r *http.
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	if funcGotHash(w, r, h, buf) {
+	gotHash := r.Header.Get("HashSHA256")
+	want := h.getHash(buf.Bytes())
+	if gotHash != "" {
+		w.Header().Set("HashSHA256", want)
+	}
+
+	if !h.checkSubscription(want, gotHash) {
+		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
@@ -195,7 +202,14 @@ func (h *Handler) GetMetricFromJSONHandler(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	if funcGotHash(w, r, h, buf) {
+	gotHash := r.Header.Get("HashSHA256")
+	want := h.getHash(buf.Bytes())
+	if gotHash != "" {
+		w.Header().Set("HashSHA256", want)
+	}
+
+	if !h.checkSubscription(want, gotHash) {
+		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
@@ -310,19 +324,19 @@ func (h *Handler) checkSubscription(want, header string) bool {
 	return true
 }
 
-func funcGotHash(w http.ResponseWriter, r *http.Request, h *Handler, buf bytes.Buffer) bool {
-	gotHash := r.Header.Get("HashSHA256")
-	want := h.getHash(buf.Bytes())
-	if gotHash != "" {
-		w.Header().Set("HashSHA256", h.getHash(buf.Bytes()))
-	}
-	if !h.checkSubscription(want, gotHash) {
-		w.WriteHeader(http.StatusBadRequest)
-		return true
-	}
-	return false
-
-}
+//func funcGotHash(w http.ResponseWriter, r *http.Request, h *Handler, buf bytes.Buffer) bool {
+//	gotHash := r.Header.Get("HashSHA256")
+//	want := h.getHash(buf.Bytes())
+//	if gotHash != "" {
+//		w.Header().Set("HashSHA256", h.getHash(buf.Bytes()))
+//	}
+//	if !h.checkSubscription(want, gotHash) {
+//		w.WriteHeader(http.StatusBadRequest)
+//		return true
+//	}
+//	return false
+//
+//}
 
 func (h *Handler) getHash(body []byte) string {
 	want := sha256.Sum256(body)
