@@ -19,8 +19,6 @@ import (
 
 func (a *Agent) CollectMetrics(ctx context.Context) (err error) {
 	storeTicker := time.NewTicker(time.Duration(a.params.PollInterval) * time.Second)
-	//var err error
-
 	go func() {
 		for {
 			select {

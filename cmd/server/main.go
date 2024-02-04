@@ -35,8 +35,7 @@ func main() {
 
 	log.SugarLogger.Infow(
 		"Starting server",
-		"addr",
-		params.FlagRunAddr)
+		"addr", params.FlagRunAddr)
 	// Инициализация ресторера
 	// инициализация переменной saver типа saver, которая будет использоваться для восстановления и сохранения метрик.
 	var saver saver

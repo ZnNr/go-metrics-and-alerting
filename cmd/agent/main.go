@@ -20,6 +20,7 @@ func main() {
 		flags.WithReportInterval(),
 		flags.WithAddr(),
 		flags.WithKey(),
+		flags.WithRateLimit(),
 	)
 
 	errs, ctx := errgroup.WithContext(context.Background())
