@@ -24,6 +24,15 @@ const (
 // Option - функция, которая изменяет поля структуры параметров
 type Option func(params *Params)
 
+func WithRateLimit() Option {
+	return func(p *Params) {
+		flag.IntVar(&p.RateLimit, "l", 1, "max requests to send on server")
+		if envKey := os.Getenv("RATE_LIMIT"); envKey != "" {
+			p.Key = envKey
+		}
+	}
+}
+
 func WithKey() Option {
 	return func(p *Params) {
 		flag.StringVar(&p.Key, "k", "", "key for using hash subscription")
@@ -139,4 +148,5 @@ type Params struct {
 	FileStoragePath string // Путь к хранилищу файлов
 	Restore         bool   // Флаг восстановления данных
 	Key             string
+	RateLimit       int
 }

@@ -37,17 +37,30 @@ func (a *Agent) CollectMetrics(ctx context.Context) (err error) {
 }
 
 func (a *Agent) SendMetrics(ctx context.Context) error {
+	numRequests := make(chan struct{}, a.params.RateLimit)
 	reportTicker := time.NewTicker(time.Duration(a.params.ReportInterval) * time.Second)
 	client := resty.New()
 	for {
 		select {
 		case <-ctx.Done():
 			return nil
+		// check if time to send metrics on server
 		case <-reportTicker.C:
-			if err := a.sendMetrics(client); err != nil {
-				return err
+			select {
+			case <-ctx.Done():
+				return nil
+			// check if the rate limit is exceeded
+			case numRequests <- struct{}{}:
+				a.log.Info("metrics sent on server")
+				if err := a.sendMetrics(client); err != nil {
+					return err
+				}
+			default:
+				a.log.Info("rate limit is exceeded")
 			}
 		}
+		// release the request pool for one
+		<-numRequests
 	}
 }
 
@@ -88,14 +101,18 @@ func (a *Agent) sendRequestsWithRetries(req *resty.Request, jsonInput string) er
 		return fmt.Errorf("error while trying to close writer: %w", err)
 	}
 
-	if err := retry.Do(func() error {
-		if _, err := req.SetBody(buf).Post(fmt.Sprintf("http://%s/update/", a.params.FlagRunAddr)); err != nil {
-			return fmt.Errorf("error while trying to create post request: %w", err)
-		}
-		return nil
-	}, retry.Attempts(10), retry.OnRetry(func(n uint, err error) {
-		log.Printf("Retrying request after error: %v", err)
-	})); err != nil {
+	if err := retry.Do(
+		func() error {
+			if _, err := req.SetBody(buf).Post(fmt.Sprintf("http://%s/update/", a.params.FlagRunAddr)); err != nil {
+				return fmt.Errorf("error while trying to create post request: %w", err)
+			}
+			return nil
+		},
+		retry.Attempts(10),
+		retry.OnRetry(func(n uint, err error) {
+			log.Printf("Retrying request after error: %v", err)
+		}),
+	); err != nil {
 		return fmt.Errorf("error while trying to connect to server: %w", err)
 	}
 	return nil

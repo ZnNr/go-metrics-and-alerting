@@ -126,12 +126,13 @@ func (h *Handler) SaveListMetricsFromJSONHandler(w http.ResponseWriter, r *http.
 		return
 	}
 
-	var metrics []collector.MetricRequest
-	if err := json.Unmarshal(buf.Bytes(), &metrics); err != nil {
+	if !h.checkSubscription(w, buf, r.Header.Get("HashSHA256")) {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	if !h.checkSubscription(w, buf, r.Header.Get("HashSHA256")) {
+
+	var metrics []collector.MetricRequest
+	if err := json.Unmarshal(buf.Bytes(), &metrics); err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
@@ -181,12 +182,18 @@ func (h *Handler) SaveListMetricsFromJSONHandler(w http.ResponseWriter, r *http.
 }
 
 func (h *Handler) GetMetricFromJSONHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("content-type", "application/json")
 	var buf bytes.Buffer
 	if _, err := buf.ReadFrom(r.Body); err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
+	gotHash := r.Header.Get("HashSHA256")
+	want := h.getHash(buf.Bytes())
+	if gotHash != "" {
+		w.Header().Set("HashSHA256", want)
+	}
 	if !h.checkSubscription(w, buf, r.Header.Get("HashSHA256")) {
 		w.WriteHeader(http.StatusBadRequest)
 		return
@@ -219,7 +226,6 @@ func (h *Handler) GetMetricFromJSONHandler(w http.ResponseWriter, r *http.Reques
 	}
 	answer, _ := json.Marshal(metric)
 
-	//w.Header().Set("content-type", "application/json")
 	if _, err = w.Write(answer); err != nil {
 		return
 	}
@@ -300,10 +306,7 @@ func (h *Handler) checkSubscription(w http.ResponseWriter, buf bytes.Buffer, hea
 		w.Header().Set("HashSHA256", want)
 	}
 	if h.key != "" && len(want) != 0 && header != "" {
-		//h := hmac.New(sha256.New, []byte(h.key))
-		//h.Write(body)
-		//dst := h.Sum(nil)
-		//return fmt.Sprintf("%x", dst) == header
+
 		return header == want
 	}
 	return true
