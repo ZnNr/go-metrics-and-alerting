@@ -26,7 +26,19 @@ func (a *Agent) CollectMetrics(ctx context.Context) (err error) {
 				err = ctx.Err()
 				return
 			case <-storeTicker.C:
-				a.storage.Store()
+				a.storage.RuntimeMetricStore()
+			}
+		}
+	}()
+
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				err = ctx.Err()
+				return
+			case <-storeTicker.C:
+				a.storage.GopsutilMetricStore()
 			}
 		}
 	}()
@@ -42,12 +54,12 @@ func (a *Agent) SendMetrics(ctx context.Context) error {
 		select {
 		case <-ctx.Done():
 			return nil
-		// check if time to send metrics on server
+		// проверяем, пришло ли время отправлять метрики на сервер
 		case <-reportTicker.C:
 			select {
 			case <-ctx.Done():
 				return nil
-			// check if the rate limit is exceeded
+			// проверяем, превышен ли лимит
 			case numRequests <- struct{}{}:
 				a.log.Info("metrics sent on server")
 				if err := a.sendMetrics(client); err != nil {
@@ -57,7 +69,7 @@ func (a *Agent) SendMetrics(ctx context.Context) error {
 				a.log.Info("rate limit is exceeded")
 			}
 		}
-		// release the request pool for one
+		// освобождаем пул запросов для одного
 		<-numRequests
 	}
 }
@@ -76,9 +88,7 @@ func (a *Agent) sendMetrics(client *resty.Client) error {
 			Value: v.GaugeValue,
 		})
 		if a.params.Key != "" {
-			//h := hmac.New(sha256.New, []byte(key))
-			//h.Write(jsonInput)
-			//dst := h.Sum(nil)
+
 			dst := sha256.Sum256(jsonInput)
 			req.SetHeader("HashSHA256", fmt.Sprintf("%x", dst))
 		}
@@ -99,18 +109,14 @@ func (a *Agent) sendRequestsWithRetries(req *resty.Request, jsonInput string) er
 		return fmt.Errorf("error while trying to close writer: %w", err)
 	}
 
-	if err := retry.Do(
-		func() error {
-			if _, err := req.SetBody(buf).Post(fmt.Sprintf("http://%s/update/", a.params.FlagRunAddr)); err != nil {
-				return fmt.Errorf("error while trying to create post request: %w", err)
-			}
-			return nil
-		},
-		retry.Attempts(10),
-		retry.OnRetry(func(n uint, err error) {
-			log.Printf("Retrying request after error: %v", err)
-		}),
-	); err != nil {
+	if err := retry.Do(func() error {
+		if _, err := req.SetBody(buf).Post(fmt.Sprintf("http://%s/update/", a.params.FlagRunAddr)); err != nil {
+			return fmt.Errorf("error while trying to create post request: %w", err)
+		}
+		return nil
+	}, retry.Attempts(10), retry.OnRetry(func(n uint, err error) {
+		log.Printf("Retrying request after error: %v", err)
+	})); err != nil {
 		return fmt.Errorf("error while trying to connect to server: %w", err)
 	}
 	return nil

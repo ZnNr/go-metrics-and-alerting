@@ -24,6 +24,7 @@ func main() {
 	)
 
 	errs, ctx := errgroup.WithContext(context.Background())
+
 	logger, err := zap.NewDevelopment()
 	if err != nil {
 		os.Exit(1)

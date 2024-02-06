@@ -22,20 +22,11 @@ func main() {
 
 	log.SugarLogger = *logger.Sugar()
 
-	params := flags.Init(
-		flags.WithAddr(),
-		flags.WithStoreInterval(),
-		flags.WithFileStoragePath(),
-		flags.WithRestore(),
-		flags.WithDatabase(),
-		flags.WithKey(),
-	)
+	params := flags.Init(flags.WithAddr(), flags.WithStoreInterval(), flags.WithFileStoragePath(), flags.WithRestore(), flags.WithDatabase(), flags.WithKey())
 
 	r := router.New(*params)
 
-	log.SugarLogger.Infow(
-		"Starting server",
-		"addr", params.FlagRunAddr)
+	log.SugarLogger.Infow("Starting server", "addr", params.FlagRunAddr)
 	// Инициализация ресторера
 	// инициализация переменной saver типа saver, которая будет использоваться для восстановления и сохранения метрик.
 	var saver saver
@@ -61,7 +52,7 @@ func main() {
 
 	// востановление метрик
 	if params.DatabaseAddress != "" || params.FileStoragePath != "" {
-		go saveMetrics(ctx, saver, params.StoreInterval)
+		go saveMetrics(ctx, saver)
 	}
 
 	// запуск сервера
@@ -71,7 +62,7 @@ func main() {
 }
 
 // saveMetrics — горутина, которая периодически сохраняет метрики
-func saveMetrics(ctx context.Context, saver saver, interval int) {
+func saveMetrics(ctx context.Context, saver saver) {
 	for {
 		if err := saver.Save(ctx, collector.Collector.Metrics); err != nil {
 			log.SugarLogger.Error(err.Error(), "save error")

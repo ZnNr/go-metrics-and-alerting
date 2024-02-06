@@ -2,13 +2,15 @@ package storage
 
 import (
 	"github.com/ZnNr/go-musthave-metrics.git/internal/collector"
+	"github.com/shirou/gopsutil/v3/cpu"
+	"github.com/shirou/gopsutil/v3/mem"
 	"math/rand"
 	"runtime"
 	"strconv"
 )
 
-// Store функуия используется для сбора метрик и сохранения их в хранилище.
-func (st *Storage) Store() {
+// RuntimeMetricStore функуия используется для сбора метрик и сохранения их в хранилище.
+func (st *Storage) RuntimeMetricStore() {
 	metrics := runtime.MemStats{}  //создается переменная metrics типа runtime.MemStats, которая представляет собой статистику памяти
 	runtime.ReadMemStats(&metrics) //вызывается функциякоторая заполняет структуру metrics актуальными данными о памяти.
 	//Происходит вызов метода Collect() объекта st.metricsCollector для каждого из собранных показателей памяти.
@@ -48,6 +50,16 @@ func (st *Storage) Store() {
 		counter = *cnt.CounterValue + 1
 	}
 	st.metricsCollector.UpsertMetric(collector.StoredMetric{ID: "PollCount", MType: "counter", CounterValue: collector.PtrInt64(counter), TextValue: collector.PtrString(strconv.Itoa(int(counter)))})
+}
+
+func (st *Storage) GopsutilMetricStore() {
+	v, _ := mem.VirtualMemory()
+	cp, _ := cpu.Percent(0, false)
+
+	st.metricsCollector.UpsertMetric(collector.StoredMetric{ID: "FreeMemory", MType: "gauge", GaugeValue: collector.PtrFloat64(float64(v.Free)), TextValue: collector.PtrString(strconv.FormatFloat(float64(v.Free), 'f', 11, 64))})
+	st.metricsCollector.UpsertMetric(collector.StoredMetric{ID: "TotalMemory", MType: "gauge", GaugeValue: collector.PtrFloat64(float64(v.Total)), TextValue: collector.PtrString(strconv.FormatFloat(float64(v.Total), 'f', 11, 64))})
+	st.metricsCollector.UpsertMetric(collector.StoredMetric{ID: "CPUutilization1", MType: "gauge", GaugeValue: collector.PtrFloat64(cp[0]), TextValue: collector.PtrString(strconv.FormatFloat(cp[0], 'f', 11, 64))})
+
 }
 
 // New - это конструктор, который создает и возвращает новый экземпляр структуры storage.
