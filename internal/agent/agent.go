@@ -27,22 +27,10 @@ func (a *Agent) CollectMetrics(ctx context.Context) (err error) {
 				return
 			case <-storeTicker.C:
 				a.storage.RuntimeMetricStore()
-			}
-		}
-	}()
-
-	go func() {
-		for {
-			select {
-			case <-ctx.Done():
-				err = ctx.Err()
-				return
-			case <-storeTicker.C:
 				a.storage.GopsutilMetricStore()
 			}
 		}
 	}()
-
 	return err
 }
 
@@ -61,16 +49,17 @@ func (a *Agent) SendMetrics(ctx context.Context) error {
 				return nil
 			// проверяем, превышен ли лимит
 			case numRequests <- struct{}{}:
-				a.log.Info("metrics sent on server")
-				if err := a.sendMetrics(client); err != nil {
-					return err
-				}
+				go func() {
+					defer func() { <-numRequests }()
+					a.log.Info("metrics sent on server")
+					if err := a.sendMetrics(client); err != nil {
+						log.Printf("error while sending metrics: %v", err)
+					}
+				}()
 			default:
 				a.log.Info("rate limit is exceeded")
 			}
 		}
-		// освобождаем пул запросов для одного
-		<-numRequests
 	}
 }
 

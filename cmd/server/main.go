@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"github.com/ZnNr/go-musthave-metrics.git/internal/collector"
 	"github.com/ZnNr/go-musthave-metrics.git/internal/flags"
 	log "github.com/ZnNr/go-musthave-metrics.git/internal/logger"
@@ -10,13 +11,13 @@ import (
 	"github.com/ZnNr/go-musthave-metrics.git/internal/saver/file"
 	"go.uber.org/zap"
 	"net/http"
-	"os"
 )
 
 func main() {
 	logger, err := zap.NewDevelopment()
 	if err != nil {
-		os.Exit(1)
+		fmt.Println("error while creating logger, exit")
+		return
 	}
 	defer logger.Sync()
 
