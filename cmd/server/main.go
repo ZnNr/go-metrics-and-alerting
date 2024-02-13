@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"github.com/ZnNr/go-musthave-metrics.git/internal/collector"
 	"github.com/ZnNr/go-musthave-metrics.git/internal/flags"
 	log "github.com/ZnNr/go-musthave-metrics.git/internal/logger"
@@ -10,32 +11,23 @@ import (
 	"github.com/ZnNr/go-musthave-metrics.git/internal/saver/file"
 	"go.uber.org/zap"
 	"net/http"
-	"time"
 )
 
 func main() {
 	logger, err := zap.NewDevelopment()
 	if err != nil {
-		panic(err)
+		fmt.Println("error while creating logger, exit")
+		return
 	}
 	defer logger.Sync()
 
 	log.SugarLogger = *logger.Sugar()
 
-	params := flags.Init(
-		flags.WithAddr(),
-		flags.WithStoreInterval(),
-		flags.WithFileStoragePath(),
-		flags.WithRestore(),
-		flags.WithDatabase(),
-	)
+	params := flags.Init(flags.WithAddr(), flags.WithStoreInterval(), flags.WithFileStoragePath(), flags.WithRestore(), flags.WithDatabase(), flags.WithKey())
 
 	r := router.New(*params)
 
-	log.SugarLogger.Infow(
-		"Starting server",
-		"addr", params.FlagRunAddr,
-	)
+	log.SugarLogger.Infow("Starting server", "addr", params.FlagRunAddr)
 	// Инициализация ресторера
 	// инициализация переменной saver типа saver, которая будет использоваться для восстановления и сохранения метрик.
 	var saver saver
@@ -61,7 +53,7 @@ func main() {
 
 	// востановление метрик
 	if params.DatabaseAddress != "" || params.FileStoragePath != "" {
-		go saveMetrics(ctx, saver, params.StoreInterval)
+		go saveMetrics(ctx, saver)
 	}
 
 	// запуск сервера
@@ -71,16 +63,10 @@ func main() {
 }
 
 // saveMetrics — горутина, которая периодически сохраняет метрики
-func saveMetrics(ctx context.Context, saver saver, interval int) {
-	ticker := time.NewTicker(time.Duration(interval))
+func saveMetrics(ctx context.Context, saver saver) {
 	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-ticker.C:
-			if err := saver.Save(ctx, collector.Collector.Metrics); err != nil {
-				log.SugarLogger.Error(err.Error(), "save error")
-			}
+		if err := saver.Save(ctx, collector.Collector.Metrics); err != nil {
+			log.SugarLogger.Error(err.Error(), "save error")
 		}
 	}
 }
