@@ -1,3 +1,5 @@
+// Package router предоставляет функционал для создания и настройки маршрутов с использованием библиотеки go-chi.
+// Включает обработку HTTP запросов, сжатие данных и логирование.
 package router
 
 import (
@@ -8,6 +10,7 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
+// New возвращает новый экземпляр маршрутизатора с настроенными обработчиками для обработки HTTP запросов.
 func New(params flags.Params) *chi.Mux {
 	handler := handlers.New(params.DatabaseAddress, params.Key)
 

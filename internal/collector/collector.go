@@ -20,7 +20,7 @@ var Collector = collector{
 	Metrics: make([]StoredMetric, 0),
 }
 
-// Collect добавляет собранную метрику в коллектор
+// Collect - метод добавления метрики из MetricRequest.
 func (c *collector) Collect(metric MetricRequest, metricValue string) error {
 	if (metric.Delta != nil && *metric.Delta < 0) || (metric.Value != nil && *metric.Value < 0) || metric.ID == "" {
 		return ErrBadRequest
@@ -41,31 +41,31 @@ func (c *collector) Collect(metric MetricRequest, metricValue string) error {
 		if v.CounterValue != nil {
 			value = value + int(*v.CounterValue)
 		}
-		metricToStore := StoredMetric{
+		c.UpsertMetric(StoredMetric{
 			ID:           metric.ID,
 			MType:        metric.MType,
 			CounterValue: PtrInt64(int64(value)),
 			TextValue:    PtrString(strconv.Itoa(value)),
-		}
-		c.UpsertMetric(metricToStore)
+		})
 	case Gauge:
 		value, err := strconv.ParseFloat(metricValue, 64)
 		if err != nil {
 			return ErrBadRequest
 		}
-		metricToStore := StoredMetric{
+		c.UpsertMetric(StoredMetric{
 			ID:         metric.ID,
 			MType:      metric.MType,
 			GaugeValue: &value,
 			TextValue:  &metricValue,
-		}
-		c.UpsertMetric(metricToStore)
+		})
 	default:
 		return ErrNotImplemented
 	}
 	return nil
 }
 
+// GetMetricJSON - метод для получения значения метрики по имени метрики.
+// Returns the JSON.
 func (c *collector) GetMetricJSON(metricName string) ([]byte, error) {
 	for _, m := range c.Metrics {
 		if m.ID == metricName {
@@ -80,6 +80,7 @@ func (c *collector) GetMetricJSON(metricName string) ([]byte, error) {
 }
 
 // GetMetric возвращает значение заданной метрики по имени метрики
+// Returns the struct of type StoredMetric
 func (c *collector) GetMetric(metricName string) (StoredMetric, error) {
 	for _, m := range c.Metrics {
 		if m.ID == metricName {
@@ -89,10 +90,10 @@ func (c *collector) GetMetric(metricName string) (StoredMetric, error) {
 	return StoredMetric{}, ErrNotFound
 }
 
-// GetAvailableMetrics Метод возвращает слайс с доступными метриками.
+// GetAvailableMetrics Метод возвращает слайс со всеми доступными метриками.
 // Внутри метода перебираются элементы счетчиков и показателей в объекте "storage" и добавляются в срез.
 func (c *collector) GetAvailableMetrics() []string {
-	names := make([]string, 0)
+	names := make([]string, 0, len(c.Metrics))
 	for _, m := range c.Metrics {
 		names = append(names, m.ID)
 	}

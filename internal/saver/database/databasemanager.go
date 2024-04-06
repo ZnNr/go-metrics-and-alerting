@@ -1,3 +1,4 @@
+// Package database предоставляет функционал для работы с базой данных в контексте метрик.
 package database
 
 import (
@@ -5,10 +6,10 @@ import (
 	"database/sql"
 	"fmt"
 	"github.com/ZnNr/go-musthave-metrics.git/internal/collector"
-	"github.com/ZnNr/go-musthave-metrics.git/internal/flags"
 	"time"
 )
 
+// Restore восстанавливает состояние метрик из базы данных.
 func (m *Manager) Restore(ctx context.Context) ([]collector.StoredMetric, error) {
 	const query = `SELECT id, mtype, delta, mvalue FROM metrics`
 	rows, err := m.db.QueryContext(ctx, query)
@@ -50,6 +51,7 @@ func (m *Manager) Restore(ctx context.Context) ([]collector.StoredMetric, error)
 	return metrics, nil
 }
 
+// Save — метод сохранения состояния метрики в БД.
 func (m *Manager) Save(ctx context.Context, metrics []collector.StoredMetric) error {
 	retries := []time.Duration{1 * time.Second, 3 * time.Second, 5 * time.Second}
 	for _, metric := range metrics {
@@ -85,21 +87,18 @@ func (m *Manager) Save(ctx context.Context, metrics []collector.StoredMetric) er
 	return nil
 }
 
+// init — метод подготовки новой БД для хранения метрик.
 func (m *Manager) init(ctx context.Context) error {
-	const query = `CREATE TABLE if NOT EXISTS metrics (id text PRIMARY KEY, mtype text, delta bigint, mvalue DOUBLE PRECISION)`
+	const query = `create table if not exists metrics (id text primary key, mtype text, delta bigint, mvalue double precision)`
 	if _, err := m.db.ExecContext(ctx, query); err != nil {
 		return fmt.Errorf("error while trying to create table: %w", err)
 	}
 	return nil
 }
 
-func New(params *flags.Params) (*Manager, error) {
+// New создает новый экземпляр менеджера базы данных.
+func New(db *sql.DB) (*Manager, error) {
 	ctx := context.Background()
-	db, err := sql.Open("pgx", params.DatabaseAddress)
-	if err != nil {
-		return nil, err
-	}
-
 	m := Manager{
 		db: db,
 	}
@@ -109,6 +108,7 @@ func New(params *flags.Params) (*Manager, error) {
 	return &m, nil
 }
 
+// Manager представляет менеджер базы данных для сохранения и восстановления метрик.
 type Manager struct {
 	db *sql.DB
 }

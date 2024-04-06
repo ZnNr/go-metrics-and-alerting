@@ -1,3 +1,5 @@
+// Package compressor предоставляет функционал для сжатия и декомпрессии данных в HTTP-запросах и ответах.
+// Используется пакет compress/gzip для работы с сжатием данных.
 package compressor
 
 import (
@@ -14,6 +16,7 @@ type compressWriter struct {
 	zw *gzip.Writer
 }
 
+// NewCompressWriter создает новый экземпляр compressWriter с инициализацией gzip.Writer.
 func NewCompressWriter(w http.ResponseWriter) *compressWriter {
 	return &compressWriter{
 		w:  w,
@@ -21,14 +24,17 @@ func NewCompressWriter(w http.ResponseWriter) *compressWriter {
 	}
 }
 
+// Header возвращает HTTP-заголовки обертки.
 func (c *compressWriter) Header() http.Header {
 	return c.w.Header()
 }
 
+// Write записывает данные в сжатом формате с использованием gzip.Writer.
 func (c *compressWriter) Write(p []byte) (int, error) {
 	return c.zw.Write(p)
 }
 
+// WriteHeader устанавливает HTTP статус ответа и добавляет Content-Encoding, если код статуса меньше 300.
 func (c *compressWriter) WriteHeader(statusCode int) {
 	if statusCode < 300 {
 		c.w.Header().Set("Content-Encoding", "gzip")

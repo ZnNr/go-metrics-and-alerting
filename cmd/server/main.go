@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"github.com/ZnNr/go-musthave-metrics.git/internal/collector"
 	"github.com/ZnNr/go-musthave-metrics.git/internal/flags"
@@ -11,11 +12,16 @@ import (
 	"github.com/ZnNr/go-musthave-metrics.git/internal/saver/file"
 	"go.uber.org/zap"
 	"net/http"
+	_ "net/http/pprof"
+	"os"
 )
+
+//const pprofAddr string = ":8080"
 
 func main() {
 	logger, err := zap.NewDevelopment()
 	if err != nil {
+		os.Exit(1)
 		fmt.Println("error while creating logger, exit")
 		return
 	}
@@ -23,7 +29,14 @@ func main() {
 
 	log.SugarLogger = *logger.Sugar()
 
-	params := flags.Init(flags.WithAddr(), flags.WithStoreInterval(), flags.WithFileStoragePath(), flags.WithRestore(), flags.WithDatabase(), flags.WithKey())
+	params := flags.Init(
+		flags.WithAddr(),
+		flags.WithStoreInterval(),
+		flags.WithFileStoragePath(),
+		flags.WithRestore(),
+		flags.WithDatabase(),
+		flags.WithKey(),
+	)
 
 	r := router.New(*params)
 
@@ -32,9 +45,14 @@ func main() {
 	// инициализация переменной saver типа saver, которая будет использоваться для восстановления и сохранения метрик.
 	var saver saver
 	if params.FileStoragePath != "" && params.DatabaseAddress == "" {
-		saver = file.New(params)
+		saver = file.New(params.FileStoragePath)
 	} else if params.DatabaseAddress != "" {
-		saver, err = database.New(params)
+		db, err := sql.Open("pgx", params.DatabaseAddress)
+		if err != nil {
+			log.SugarLogger.Error(err.Error(), "open db error")
+			os.Exit(1)
+		}
+		saver, err = database.New(db)
 		if err != nil {
 			log.SugarLogger.Errorf(err.Error())
 		}
@@ -53,8 +71,12 @@ func main() {
 
 	// востановление метрик
 	if params.DatabaseAddress != "" || params.FileStoragePath != "" {
-		go saveMetrics(ctx, saver)
+		go saveMetrics(ctx, saver, params.StoreInterval)
 	}
+
+	//if err := http.ListenAndServe(pprofAddr, nil); err != nil {
+	//	log.SugarLogger.Fatalw(err.Error(), "pprof", "start pprof server")
+	//}
 
 	// запуск сервера
 	if err := http.ListenAndServe(params.FlagRunAddr, r); err != nil {
@@ -63,7 +85,7 @@ func main() {
 }
 
 // saveMetrics — горутина, которая периодически сохраняет метрики
-func saveMetrics(ctx context.Context, saver saver) {
+func saveMetrics(ctx context.Context, saver saver, interval int) {
 	for {
 		if err := saver.Save(ctx, collector.Collector.Metrics); err != nil {
 			log.SugarLogger.Error(err.Error(), "save error")

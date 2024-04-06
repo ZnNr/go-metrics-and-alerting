@@ -10,16 +10,24 @@ import (
 	"github.com/ZnNr/go-musthave-metrics.git/internal/storage"
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
+	"os"
 )
 
 func main() {
 	//Инициализируются параметры программы, используя пакет flags.
-	params := flags.Init(flags.WithPollInterval(), flags.WithReportInterval(), flags.WithAddr(), flags.WithKey(), flags.WithRateLimit())
+	params := flags.Init(
+		flags.WithPollInterval(),
+		flags.WithReportInterval(),
+		flags.WithAddr(),
+		flags.WithKey(),
+		flags.WithRateLimit(),
+	)
 
 	errs, ctx := errgroup.WithContext(context.Background())
 
 	logger, err := zap.NewDevelopment()
 	if err != nil {
+		os.Exit(1)
 		fmt.Println("error while creating logger, exit")
 		return
 	}
