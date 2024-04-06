@@ -14,13 +14,7 @@ import (
 
 func main() {
 	//Инициализируются параметры программы, используя пакет flags.
-	params := flags.Init(
-		flags.WithPollInterval(),
-		flags.WithReportInterval(),
-		flags.WithAddr(),
-		flags.WithKey(),
-		flags.WithRateLimit(),
-	)
+	params := flags.Init(flags.WithPollInterval(), flags.WithReportInterval(), flags.WithAddr(), flags.WithKey(), flags.WithRateLimit())
 
 	errs, ctx := errgroup.WithContext(context.Background())
 
