@@ -14,29 +14,21 @@ import (
 	"net/http"
 	_ "net/http/pprof"
 	"os"
+	"time"
 )
 
-//const pprofAddr string = ":8080"
+const pprofAddr string = ":6060"
 
 func main() {
 	logger, err := zap.NewDevelopment()
 	if err != nil {
-		os.Exit(1)
 		fmt.Println("error while creating logger, exit")
-		return
+		os.Exit(1)
 	}
-	defer logger.Sync()
 
 	log.SugarLogger = *logger.Sugar()
 
-	params := flags.Init(
-		flags.WithAddr(),
-		flags.WithStoreInterval(),
-		flags.WithFileStoragePath(),
-		flags.WithRestore(),
-		flags.WithDatabase(),
-		flags.WithKey(),
-	)
+	params := flags.Init(flags.WithAddr(), flags.WithStoreInterval(), flags.WithFileStoragePath(), flags.WithRestore(), flags.WithDatabase(), flags.WithKey())
 
 	r := router.New(*params)
 
@@ -49,8 +41,7 @@ func main() {
 	} else if params.DatabaseAddress != "" {
 		db, err := sql.Open("pgx", params.DatabaseAddress)
 		if err != nil {
-			log.SugarLogger.Error(err.Error(), "open db error")
-			os.Exit(1)
+			log.SugarLogger.Fatal(err.Error(), "open db error")
 		}
 		saver, err = database.New(db)
 		if err != nil {
@@ -74,14 +65,15 @@ func main() {
 		go saveMetrics(ctx, saver, params.StoreInterval)
 	}
 
-	//if err := http.ListenAndServe(pprofAddr, nil); err != nil {
-	//	log.SugarLogger.Fatalw(err.Error(), "pprof", "start pprof server")
-	//}
+	if err := http.ListenAndServe(pprofAddr, nil); err != nil {
+		log.SugarLogger.Fatalw(err.Error(), "pprof", "start pprof server")
+	}
 
 	// запуск сервера
 	if err := http.ListenAndServe(params.FlagRunAddr, r); err != nil {
 		log.SugarLogger.Fatalw(err.Error(), "event", "start server")
 	}
+
 }
 
 // saveMetrics — горутина, которая периодически сохраняет метрики
@@ -90,6 +82,7 @@ func saveMetrics(ctx context.Context, saver saver, interval int) {
 		if err := saver.Save(ctx, collector.Collector.Metrics); err != nil {
 			log.SugarLogger.Error(err.Error(), "save error")
 		}
+		time.Sleep(time.Duration(interval) * time.Second) // добавляем небольшую задержку перед очередным сохранением
 	}
 }
 

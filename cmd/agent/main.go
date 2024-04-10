@@ -27,12 +27,10 @@ func main() {
 
 	logger, err := zap.NewDevelopment()
 	if err != nil {
-		os.Exit(1)
 		fmt.Println("error while creating logger, exit")
-		return
+		os.Exit(1)
 	}
 
-	defer logger.Sync()
 	log.SugarLogger = *logger.Sugar()
 
 	agent := metricagent.New(params, storage.New(&collector.Collector), log.SugarLogger)
@@ -42,7 +40,7 @@ func main() {
 	errs.Go(func() error {
 		return agent.SendMetrics(ctx)
 	})
-	if err := errs.Wait(); err != nil {
+	if err = errs.Wait(); err != nil {
 		log.SugarLogger.Errorf(fmt.Sprintf("error while running agent: %s", err.Error()))
 	}
 }
