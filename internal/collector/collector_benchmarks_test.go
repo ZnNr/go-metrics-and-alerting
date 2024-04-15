@@ -2,6 +2,7 @@ package collector
 
 import (
 	"github.com/stretchr/testify/assert"
+	"log"
 	"testing"
 )
 
@@ -45,62 +46,61 @@ func createTestBenchCollector() collector {
 }
 
 func BenchmarkCollector_Collect(b *testing.B) {
-	b.Run("collect benchmark", func(b *testing.B) {
-		metric := MetricRequest{
-			ID:    "new",
-			MType: "gauge",
-			Value: PtrFloat64(50.1001),
-		}
-		var err error
-		for i := 0; i < b.N; i++ {
-			err = testBenchCollector.Collect(metric, "50.1001")
-		}
-		assert.NoError(b, err)
-	})
+	log.Println("collect benchmark")
+	metric := MetricRequest{
+		ID:    "new",
+		MType: "gauge",
+		Value: PtrFloat64(50.1001),
+	}
+	var err error
+	for i := 0; i < b.N; i++ {
+		err = testBenchCollector.Collect(metric, "50.1001")
+	}
+	assert.NoError(b, err)
 
 }
 func BenchmarkCollector_GetAvailableMetrics(b *testing.B) {
-	b.Run("get available metrics benchmark", func(b *testing.B) {
-		for i := 0; i < b.N; i++ {
-			testBenchCollector.GetAvailableMetrics()
-		}
-	})
+	log.Println("get available metrics benchmark")
+	for i := 0; i < b.N; i++ {
+		testBenchCollector.GetAvailableMetrics()
+	}
+
 }
 
 func BenchmarkCollector_GetMetric(b *testing.B) {
-	b.Run("get metric benchmark", func(b *testing.B) {
-		metricName := "Requests"
-		var err error // Глобальная переменная для ошибок
-		for i := 0; i < b.N; i++ {
-			_, err = testBenchCollector.GetMetric(metricName)
-		}
-		assert.NoError(b, err)
-	})
+	log.Println("get metric benchmark")
+	metricName := "Requests"
+	var err error // Глобальная переменная для ошибок
+	for i := 0; i < b.N; i++ {
+		_, err = testBenchCollector.GetMetric(metricName)
+	}
+	assert.NoError(b, err)
+
 }
 
 func BenchmarkCollector_GetMetricJSON(b *testing.B) {
-	b.Run("get metric json benchmark", func(b *testing.B) {
-		metricName := "Requests"
-		var err error // Глобальная переменная для ошибок
-		for i := 0; i < b.N; i++ {
-			_, err = testBenchCollector.GetMetricJSON(metricName)
-		}
-		assert.NoError(b, err)
-	})
+	log.Println("get metric json benchmark")
+	metricName := "Requests"
+	var err error // Глобальная переменная для ошибок
+	for i := 0; i < b.N; i++ {
+		_, err = testBenchCollector.GetMetricJSON(metricName)
+	}
+	assert.NoError(b, err)
+
 }
 
 func BenchmarkCollector_UpsertMetric(b *testing.B) {
-	b.Run("upsert metric benchmark", func(b *testing.B) {
-		metric := StoredMetric{
-			ID:         "Alloc",
-			MType:      "gauge",
-			GaugeValue: PtrFloat64(3),
-			TextValue:  PtrString("3"),
-		}
-		for i := 0; i < b.N; i++ {
-			testBenchCollector.UpsertMetric(metric)
-		}
-	})
+	log.Println("upsert metric benchmark")
+	metric := StoredMetric{
+		ID:         "Alloc",
+		MType:      "gauge",
+		GaugeValue: PtrFloat64(3),
+		TextValue:  PtrString("3"),
+	}
+	for i := 0; i < b.N; i++ {
+		testBenchCollector.UpsertMetric(metric)
+	}
+
 }
 
 // тестирование бенчмарка в комплексном (грубо упрощенном) сценарии из двух условных методов
@@ -110,25 +110,25 @@ type testCase struct {
 }
 
 func (tc *testCase) method1(b *testing.B) {
-	b.Run("get available metrics benchmark", func(b *testing.B) {
-		for i := 0; i < b.N; i++ {
-			testBenchCollector.GetAvailableMetrics()
-		}
-	})
+	log.Println("get available metrics benchmark")
+	for i := 0; i < b.N; i++ {
+		testBenchCollector.GetAvailableMetrics()
+	}
+
 }
 
 func (tc *testCase) method2(b *testing.B) {
-	b.Run("upsert metric benchmark", func(b *testing.B) {
-		metric := StoredMetric{
-			ID:         "Alloc",
-			MType:      "gauge",
-			GaugeValue: PtrFloat64(3),
-			TextValue:  PtrString("3"),
-		}
-		for i := 0; i < b.N; i++ {
-			testBenchCollector.UpsertMetric(metric)
-		}
-	})
+	log.Println("upsert metric benchmark")
+	metric := StoredMetric{
+		ID:         "Alloc",
+		MType:      "gauge",
+		GaugeValue: PtrFloat64(3),
+		TextValue:  PtrString("3"),
+	}
+	for i := 0; i < b.N; i++ {
+		testBenchCollector.UpsertMetric(metric)
+	}
+
 }
 
 func BenchmarkCollector_ComplexScenario(b *testing.B) {
