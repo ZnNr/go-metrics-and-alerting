@@ -1,3 +1,5 @@
+// Package flags предоставляет функционал для обработки флагов командной строки и настройки параметров приложения.
+// Используется пакет flag стандартной библиотеки для работы с флагами и настройками.
 package flags
 
 import (
@@ -24,6 +26,7 @@ const (
 // Option - функция, которая изменяет поля структуры параметров
 type Option func(params *Params)
 
+// WithRateLimit создает опцию для установки ограничения запросов.
 func WithRateLimit() Option {
 	return func(p *Params) {
 		flag.IntVar(&p.RateLimit, "l", 1, "max requests to send on server")
@@ -33,6 +36,7 @@ func WithRateLimit() Option {
 	}
 }
 
+// WithKey создает опцию для установки ключа подписки.
 func WithKey() Option {
 	return func(p *Params) {
 		flag.StringVar(&p.Key, "k", "", "key for using hash subscription")
@@ -139,6 +143,7 @@ func Init(opts ...Option) *Params {
 	return p
 }
 
+// Params содержит параметры приложения.
 type Params struct {
 	FlagRunAddr     string // Адрес и порт сервера
 	DatabaseAddress string // Адрес базы данных
@@ -147,6 +152,6 @@ type Params struct {
 	StoreInterval   int    // Интервал сохранения
 	FileStoragePath string // Путь к хранилищу файлов
 	Restore         bool   // Флаг восстановления данных
-	Key             string
-	RateLimit       int
+	Key             string // Ключ подписки
+	RateLimit       int    // Ограничение запросов
 }

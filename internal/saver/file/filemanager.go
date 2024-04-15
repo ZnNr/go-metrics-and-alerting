@@ -1,3 +1,4 @@
+// Package file предоставляет функционал для сохранения и восстановления состояния метрик из файла.
 package file
 
 import (
@@ -5,11 +6,11 @@ import (
 	"context"
 	"encoding/json"
 	"github.com/ZnNr/go-musthave-metrics.git/internal/collector"
-	"github.com/ZnNr/go-musthave-metrics.git/internal/flags"
 	"os"
 )
 
-func (m *Manager) Restore(ctx context.Context) ([]collector.StoredMetric, error) {
+// Restore восстанавливает состояние метрик из файла.
+func (m *manager) Restore(ctx context.Context) ([]collector.StoredMetric, error) {
 	file, err := os.OpenFile(m.fileName, os.O_RDONLY|os.O_CREATE, 0666)
 	if err != nil {
 		return nil, err
@@ -17,26 +18,26 @@ func (m *Manager) Restore(ctx context.Context) ([]collector.StoredMetric, error)
 
 	scanner := bufio.NewScanner(file)
 	if !scanner.Scan() {
-		return nil, err
+		return nil, scanner.Err()
 	}
 
 	data := scanner.Bytes()
 	var metricsFromFile []collector.StoredMetric
-	if err = json.Unmarshal(data, &metricsFromFile); err != nil {
+	if err := json.Unmarshal(data, &metricsFromFile); err != nil {
 		return nil, err
 	}
 	return metricsFromFile, nil
 }
 
-func (m *Manager) Save(ctx context.Context, metrics []collector.StoredMetric) error {
-	var saveError error
+// Save сохраняет состояние метрик в файл.
+func (m *manager) Save(ctx context.Context, metrics []collector.StoredMetric) error {
 	file, err := os.OpenFile(m.fileName, os.O_WRONLY|os.O_CREATE, 0666)
 	if err != nil {
 		return err
 	}
 	defer func() {
-		if err := file.Close(); err != nil {
-			saveError = err
+		if cerr := file.Close(); cerr != nil {
+			err = cerr
 		}
 	}()
 
@@ -46,22 +47,25 @@ func (m *Manager) Save(ctx context.Context, metrics []collector.StoredMetric) er
 	if err != nil {
 		return err
 	}
-	if _, err := writer.Write(data); err != nil {
+	_, err = writer.Write(data)
+	if err != nil {
 		return err
 	}
-	if err := writer.WriteByte('\n'); err != nil {
+
+	if err = writer.WriteByte('\n'); err != nil {
 		return err
 	}
-	if err := writer.Flush(); err != nil {
+	if err = writer.Flush(); err != nil {
 		return err
 	}
-	return saveError
+	return nil
 }
 
-func New(params *flags.Params) *Manager {
-	return &Manager{fileName: params.FileStoragePath}
+// New создает новый менеджер для работы с файлами.
+func New(path string) *manager {
+	return &manager{fileName: path}
 }
 
-type Manager struct {
+type manager struct {
 	fileName string
 }

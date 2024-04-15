@@ -9,7 +9,8 @@ import (
 	"strconv"
 )
 
-// RuntimeMetricStore функуия используется для сбора метрик и сохранения их в хранилище.
+// RuntimeMetricStore метод используется для сбора метрик и сохранения их в хранилище.
+// a method for capturing and upserting runtime metrics.
 func (st *Storage) RuntimeMetricStore() {
 	metrics := runtime.MemStats{}  //создается переменная metrics типа runtime.MemStats, которая представляет собой статистику памяти
 	runtime.ReadMemStats(&metrics) //вызывается функциякоторая заполняет структуру metrics актуальными данными о памяти.
@@ -52,6 +53,7 @@ func (st *Storage) RuntimeMetricStore() {
 	st.metricsCollector.UpsertMetric(collector.StoredMetric{ID: "PollCount", MType: "counter", CounterValue: collector.PtrInt64(counter), TextValue: collector.PtrString(strconv.Itoa(int(counter)))})
 }
 
+// GopsutilMetricStore метод для сбора и сохранения метрик gopsutil
 func (st *Storage) GopsutilMetricStore() {
 	v, _ := mem.VirtualMemory()
 	cp, _ := cpu.Percent(0, false)

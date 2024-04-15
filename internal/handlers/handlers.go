@@ -18,6 +18,7 @@ import (
 	"time"
 )
 
+// SaveMetricHandler - a method for saving metric from url.
 func (h *Handler) SaveMetricHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		w.WriteHeader(http.StatusMethodNotAllowed)
@@ -51,6 +52,7 @@ func (h *Handler) SaveMetricHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("content-length", strconv.Itoa(len(metricName)))
 }
 
+// SaveMetricFromJSONHandler - a method for saving metric from JSON body of http request.
 func (h *Handler) SaveMetricFromJSONHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		w.WriteHeader(http.StatusMethodNotAllowed)
@@ -114,6 +116,7 @@ func (h *Handler) SaveMetricFromJSONHandler(w http.ResponseWriter, r *http.Reque
 	w.WriteHeader(http.StatusOK)
 }
 
+// SaveListMetricsFromJSONHandler - a method for saving a list of metrics from JSON body of http request.
 func (h *Handler) SaveListMetricsFromJSONHandler(w http.ResponseWriter, r *http.Request) {
 	fmt.Println(collector.Collector.Metrics)
 	if r.Method != http.MethodPost {
@@ -181,6 +184,7 @@ func (h *Handler) SaveListMetricsFromJSONHandler(w http.ResponseWriter, r *http.
 	w.WriteHeader(http.StatusOK)
 }
 
+// GetMetricFromJSONHandler - a method for getting metrics by JSON from http request.
 func (h *Handler) GetMetricFromJSONHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("content-type", "application/json")
 	var buf bytes.Buffer
@@ -235,6 +239,7 @@ func (h *Handler) GetMetricFromJSONHandler(w http.ResponseWriter, r *http.Reques
 	fmt.Println("HEADERS: ", w.Header())
 }
 
+// GetMetricHandler - a metric for getting metric from url.
 func (h *Handler) GetMetricHandler(w http.ResponseWriter, r *http.Request) {
 	metricType := chi.URLParam(r, "type")
 	metricName := chi.URLParam(r, "name")
@@ -261,6 +266,7 @@ func (h *Handler) GetMetricHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("content-type", "text/plain; charset=utf-8")
 }
 
+// ShowMetricsHandler - a method for getting all available metrics from server.
 func (h *Handler) ShowMetricsHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("content-type", "Content-Type: text/html; charset=utf-8")
 	if r.URL.Path != "/" {
@@ -312,6 +318,7 @@ func (h *Handler) checkSubscription(w http.ResponseWriter, buf bytes.Buffer, hea
 	return true
 }
 
+// getHash - a method for getting hash from request body.
 func (h *Handler) getHash(body []byte) string {
 	want := sha256.Sum256(body)
 	wantDecoded := fmt.Sprintf("%x", want)

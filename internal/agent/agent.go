@@ -1,3 +1,6 @@
+// Package agent
+// Модуль agent собирает определенный набор runtime и gopsutil
+// метрик и отправляет их на сервер.
 package agent
 
 import (
@@ -17,6 +20,7 @@ import (
 	"time"
 )
 
+// CollectMetrics — метод для сбора метрик времени выполнения и gopsutil.
 func (a *Agent) CollectMetrics(ctx context.Context) (err error) {
 	storeTicker := time.NewTicker(time.Duration(a.params.PollInterval) * time.Second)
 	go func() {
@@ -34,6 +38,7 @@ func (a *Agent) CollectMetrics(ctx context.Context) (err error) {
 	return err
 }
 
+// SendMetrics — метод отправки метрик на сервер по таймеру
 func (a *Agent) SendMetrics(ctx context.Context) error {
 	numRequests := make(chan struct{}, a.params.RateLimit)
 	reportTicker := time.NewTicker(time.Duration(a.params.ReportInterval) * time.Second)
@@ -63,6 +68,7 @@ func (a *Agent) SendMetrics(ctx context.Context) error {
 	}
 }
 
+// sendMetrics — метод, инкапсулирующий логику отправки http-запроса на сервер.
 func (a *Agent) sendMetrics(client *resty.Client) error {
 	req := client.R().
 		SetHeader("Content-Type", "application/json").
@@ -88,6 +94,7 @@ func (a *Agent) sendMetrics(client *resty.Client) error {
 	return nil
 }
 
+// sendMetrics — метод, реализующий логику отправки запроса с повторами.
 func (a *Agent) sendRequestsWithRetries(req *resty.Request, jsonInput string) error {
 	buf := bytes.NewBuffer(nil)
 	zb := gzip.NewWriter(buf)
@@ -98,19 +105,24 @@ func (a *Agent) sendRequestsWithRetries(req *resty.Request, jsonInput string) er
 		return fmt.Errorf("error while trying to close writer: %w", err)
 	}
 
-	if err := retry.Do(func() error {
-		if _, err := req.SetBody(buf).Post(fmt.Sprintf("http://%s/update/", a.params.FlagRunAddr)); err != nil {
-			return fmt.Errorf("error while trying to create post request: %w", err)
-		}
-		return nil
-	}, retry.Attempts(10), retry.OnRetry(func(n uint, err error) {
-		log.Printf("Retrying request after error: %v", err)
-	})); err != nil {
+	if err := retry.Do(
+		func() error {
+			if _, err := req.SetBody(buf).Post(fmt.Sprintf("http://%s/update/", a.params.FlagRunAddr)); err != nil {
+				return fmt.Errorf("error while trying to create post request: %w", err)
+			}
+			return nil
+		},
+		retry.Attempts(10),
+		retry.OnRetry(func(n uint, err error) {
+			log.Printf("Retrying request after error: %v", err)
+		}),
+	); err != nil {
 		return fmt.Errorf("error while trying to connect to server: %w", err)
 	}
 	return nil
 }
 
+// New - функция для создания нового экземпляра Agent.
 func New(params *flags.Params, storage *storage.Storage, log zap.SugaredLogger) *Agent {
 	return &Agent{
 		params:  params,
@@ -119,6 +131,7 @@ func New(params *flags.Params, storage *storage.Storage, log zap.SugaredLogger) 
 	}
 }
 
+// Agent - структура, представляющая агента.
 type Agent struct {
 	params  *flags.Params
 	storage *storage.Storage
