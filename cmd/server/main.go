@@ -13,7 +13,6 @@ import (
 	"go.uber.org/zap"
 	"net/http"
 	_ "net/http/pprof"
-	"os"
 	"time"
 )
 
@@ -23,9 +22,10 @@ func main() {
 	logger, err := zap.NewDevelopment()
 	if err != nil {
 		fmt.Println("error while creating logger, exit")
-		os.Exit(1)
-	}
+		return
 
+	}
+	defer logger.Sync()
 	log.SugarLogger = *logger.Sugar()
 
 	params := flags.Init(flags.WithAddr(), flags.WithStoreInterval(), flags.WithFileStoragePath(), flags.WithRestore(), flags.WithDatabase(), flags.WithKey())
@@ -42,6 +42,7 @@ func main() {
 		db, err := sql.Open("pgx", params.DatabaseAddress)
 		if err != nil {
 			log.SugarLogger.Fatal(err.Error(), "open db error")
+			return
 		}
 		saver, err = database.New(db)
 		if err != nil {

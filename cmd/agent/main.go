@@ -10,7 +10,6 @@ import (
 	"github.com/ZnNr/go-musthave-metrics.git/internal/storage"
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
-	"os"
 )
 
 func main() {
@@ -28,9 +27,9 @@ func main() {
 	logger, err := zap.NewDevelopment()
 	if err != nil {
 		fmt.Println("error while creating logger, exit")
-		os.Exit(1)
-	}
 
+	}
+	defer logger.Sync()
 	log.SugarLogger = *logger.Sugar()
 
 	agent := metricagent.New(params, storage.New(&collector.Collector), log.SugarLogger)
