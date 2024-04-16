@@ -12,15 +12,17 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
+var (
+	BuildVersion string = "N/A"
+	BuildDate    string = "N/A"
+	BuildCommit  string = "N/A"
+)
+
 func main() {
+	fmt.Printf("Build version: %s\nBuild date: %s\nBuild commit: %s\n", BuildVersion, BuildDate, BuildCommit)
+
 	//Инициализируются параметры программы, используя пакет flags.
-	params := flags.Init(
-		flags.WithPollInterval(),
-		flags.WithReportInterval(),
-		flags.WithAddr(),
-		flags.WithKey(),
-		flags.WithRateLimit(),
-	)
+	params := flags.Init(flags.WithPollInterval(), flags.WithReportInterval(), flags.WithAddr(), flags.WithKey(), flags.WithRateLimit())
 
 	errs, ctx := errgroup.WithContext(context.Background())
 

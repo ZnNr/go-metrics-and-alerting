@@ -18,7 +18,16 @@ import (
 
 const pprofAddr string = ":6060"
 
+var (
+	BuildVersion string = "N/A"
+	BuildDate    string = "N/A"
+	BuildCommit  string = "N/A"
+)
+
 func main() {
+
+	fmt.Printf("Build version: %s\nBuild date: %s\nBuild commit: %s\n", BuildVersion, BuildDate, BuildCommit)
+
 	logger, err := zap.NewDevelopment()
 	if err != nil {
 		fmt.Println("error while creating logger, exit")
