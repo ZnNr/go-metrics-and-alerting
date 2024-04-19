@@ -10,27 +10,28 @@ import (
 	"github.com/ZnNr/go-musthave-metrics.git/internal/storage"
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
-	"os"
+)
+
+var (
+	BuildVersion string = "N/A"
+	BuildDate    string = "N/A"
+	BuildCommit  string = "N/A"
 )
 
 func main() {
+	fmt.Printf("Build version: %s\nBuild date: %s\nBuild commit: %s\n", BuildVersion, BuildDate, BuildCommit)
+
 	//Инициализируются параметры программы, используя пакет flags.
-	params := flags.Init(
-		flags.WithPollInterval(),
-		flags.WithReportInterval(),
-		flags.WithAddr(),
-		flags.WithKey(),
-		flags.WithRateLimit(),
-	)
+	params := flags.Init(flags.WithPollInterval(), flags.WithReportInterval(), flags.WithAddr(), flags.WithKey(), flags.WithRateLimit())
 
 	errs, ctx := errgroup.WithContext(context.Background())
 
 	logger, err := zap.NewDevelopment()
 	if err != nil {
 		fmt.Println("error while creating logger, exit")
-		os.Exit(1)
-	}
 
+	}
+	defer logger.Sync()
 	log.SugarLogger = *logger.Sugar()
 
 	agent := metricagent.New(params, storage.New(&collector.Collector), log.SugarLogger)

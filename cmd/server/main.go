@@ -13,19 +13,28 @@ import (
 	"go.uber.org/zap"
 	"net/http"
 	_ "net/http/pprof"
-	"os"
 	"time"
 )
 
 const pprofAddr string = ":6060"
 
+var (
+	BuildVersion string = "N/A"
+	BuildDate    string = "N/A"
+	BuildCommit  string = "N/A"
+)
+
 func main() {
+
+	fmt.Printf("Build version: %s\nBuild date: %s\nBuild commit: %s\n", BuildVersion, BuildDate, BuildCommit)
+
 	logger, err := zap.NewDevelopment()
 	if err != nil {
 		fmt.Println("error while creating logger, exit")
-		os.Exit(1)
-	}
+		return
 
+	}
+	defer logger.Sync()
 	log.SugarLogger = *logger.Sugar()
 
 	params := flags.Init(flags.WithAddr(), flags.WithStoreInterval(), flags.WithFileStoragePath(), flags.WithRestore(), flags.WithDatabase(), flags.WithKey())
@@ -42,6 +51,7 @@ func main() {
 		db, err := sql.Open("pgx", params.DatabaseAddress)
 		if err != nil {
 			log.SugarLogger.Fatal(err.Error(), "open db error")
+			return
 		}
 		saver, err = database.New(db)
 		if err != nil {
