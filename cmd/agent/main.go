@@ -15,6 +15,7 @@ import (
 func main() {
 	//Инициализируются параметры программы, используя пакет flags.
 	params := flags.Init(
+		flags.WithConfig(),
 		flags.WithPollInterval(),
 		flags.WithReportInterval(),
 		flags.WithAddr(), flags.WithKey(),

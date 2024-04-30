@@ -9,6 +9,7 @@ import (
 func main() {
 	// Инициализация параметров программы.
 	params := flags.Init(
+		flags.WithConfig(),
 		flags.WithAddr(),
 		flags.WithStoreInterval(),
 		flags.WithFileStoragePath(),

@@ -239,7 +239,7 @@ func (h *Handler) ShowMetricsHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, fmt.Sprintf("wrong path %q", r.URL.Path), http.StatusNotFound)
 		return
 	}
-	page := ""
+	var page string
 	for _, n := range collector.Collector.GetAvailableMetrics() {
 		page += fmt.Sprintf("<h1>	%s</h1>", n)
 	}
