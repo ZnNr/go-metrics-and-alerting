@@ -26,7 +26,8 @@ func main() {
 	// Создание логгера.
 	logger, err := zap.NewDevelopment()
 	if err != nil {
-		fmt.Errorf("error while creating logger, exit %v", err)
+		fmt.Println("error while creating logger, exit")
+		return
 	}
 	defer logger.Sync()
 	log.SugarLogger = *logger.Sugar()
