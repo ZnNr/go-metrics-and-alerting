@@ -18,7 +18,7 @@ const (
 	// Интервал сохранения по умолчанию (в секундах)
 	defaultStoreInterval int = 15
 	// Путь к файлу хранения по умолчанию
-	defaultFileStoragePath string = "/tmp/short-url-db.json"
+	defaultFileStoragePath string = "/tmp/metrics-db.json"
 	// Восстанавливать состояние по умолчанию или нет
 	defaultRestore bool = true
 )
@@ -133,6 +133,16 @@ func WithRestore() Option {
 	}
 }
 
+// WithTLSKeyPath Опция устанавливает путь к криптографическому
+func WithTLSKeyPath() Option {
+	return func(p *Params) {
+		flag.StringVar(&p.CryptoKeyPath, "crypto-key", "", "crypto key path")
+		if envCryptoKeyPath := os.Getenv("CRYPTO_KEY"); envCryptoKeyPath != "" {
+			p.CryptoKeyPath = envCryptoKeyPath
+		}
+	}
+}
+
 // Init Инициализация параметров с помощью опций
 func Init(opts ...Option) *Params {
 	p := &Params{}
@@ -154,4 +164,5 @@ type Params struct {
 	Restore         bool   // Флаг восстановления данных
 	Key             string // Ключ подписки
 	RateLimit       int    // Ограничение запросов
+	CryptoKeyPath   string // Путь к криптографическому ключу
 }

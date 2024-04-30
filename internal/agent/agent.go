@@ -7,8 +7,13 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
+	"crypto/rand"
+	"crypto/rsa"
 	"crypto/sha256"
+	"crypto/x509"
 	"encoding/json"
+	"encoding/pem"
+	"errors"
 	"fmt"
 	"github.com/ZnNr/go-musthave-metrics.git/internal/collector"
 	"github.com/ZnNr/go-musthave-metrics.git/internal/flags"
@@ -17,17 +22,20 @@ import (
 	"github.com/go-resty/resty/v2"
 	"go.uber.org/zap"
 	"log"
+	"os"
 	"time"
 )
 
 // CollectMetrics — метод для сбора метрик времени выполнения и gopsutil.
 func (a *Agent) CollectMetrics(ctx context.Context) (err error) {
-	storeTicker := time.NewTicker(time.Duration(a.params.PollInterval) * time.Second)
+	storeTicker := time.NewTicker(time.Second * time.Duration(a.params.PollInterval))
+	defer storeTicker.Stop()
 	go func() {
 		for {
 			select {
 			case <-ctx.Done():
 				err = ctx.Err()
+				a.log.Warn("Collection of metrics stopped")
 				return
 			case <-storeTicker.C:
 				a.storage.RuntimeMetricStore()
@@ -35,7 +43,7 @@ func (a *Agent) CollectMetrics(ctx context.Context) (err error) {
 			}
 		}
 	}()
-	return err
+	return nil // Возвращаем nil, т.к. err уже присваивается внутри горутины
 }
 
 // SendMetrics — метод отправки метрик на сервер по таймеру
@@ -46,11 +54,13 @@ func (a *Agent) SendMetrics(ctx context.Context) error {
 	for {
 		select {
 		case <-ctx.Done():
+			a.log.Warn("Sending of metrics stopped")
 			return nil
 		// проверяем, пришло ли время отправлять метрики на сервер
 		case <-reportTicker.C:
 			select {
 			case <-ctx.Done():
+				a.log.Info("reportTicker.C triggered")
 				return nil
 			// проверяем, превышен ли лимит
 			case numRequests <- struct{}{}:
@@ -87,7 +97,15 @@ func (a *Agent) sendMetrics(client *resty.Client) error {
 			dst := sha256.Sum256(jsonInput)
 			req.SetHeader("HashSHA256", fmt.Sprintf("%x", dst))
 		}
-		if err := a.sendRequestsWithRetries(req, string(jsonInput)); err != nil {
+		message := string(jsonInput)
+		if a.cryptoKey != nil {
+			encryptedData, err := rsa.EncryptPKCS1v15(rand.Reader, a.cryptoKey, jsonInput)
+			if err != nil {
+				return fmt.Errorf("error encrypting message with public key: %w", err)
+			}
+			message = string(encryptedData)
+		}
+		if err := a.sendRequestsWithRetries(req, message); err != nil {
 			return fmt.Errorf("error while sending agent request for counter metric: %w", err)
 		}
 	}
@@ -123,17 +141,52 @@ func (a *Agent) sendRequestsWithRetries(req *resty.Request, jsonInput string) er
 }
 
 // New - функция для создания нового экземпляра Agent.
-func New(params *flags.Params, storage *storage.Storage, log zap.SugaredLogger) *Agent {
-	return &Agent{
+func New(params *flags.Params, storage *storage.Storage, log zap.SugaredLogger) (*Agent, error) {
+	agent := &Agent{
 		params:  params,
 		storage: storage,
 		log:     log,
 	}
+
+	if params.CryptoKeyPath != "" {
+		if publicKey, err := readCryptoPublicKey(params.CryptoKeyPath); err != nil {
+			return nil, fmt.Errorf("error reading crypto public key: %w", err)
+		} else {
+			agent.cryptoKey = publicKey
+		}
+	}
+
+	return agent, nil
+}
+
+func readCryptoPublicKey(cryptoKeyPath string) (*rsa.PublicKey, error) {
+	b, err := os.ReadFile(cryptoKeyPath)
+	if err != nil {
+		return nil, err
+	}
+
+	block, _ := pem.Decode(b)
+	if block == nil {
+		return nil, errors.New("failed to decode PEM block")
+	}
+
+	publicKey, err := x509.ParsePKIXPublicKey(block.Bytes)
+	if err != nil {
+		return nil, err
+	}
+
+	rsaPublicKey, ok := publicKey.(*rsa.PublicKey)
+	if !ok {
+		return nil, errors.New("parsed public key is not an RSA public key")
+	}
+
+	return rsaPublicKey, nil
 }
 
 // Agent - структура, представляющая агента.
 type Agent struct {
-	params  *flags.Params
-	storage *storage.Storage
-	log     zap.SugaredLogger
+	params    *flags.Params
+	storage   *storage.Storage
+	cryptoKey *rsa.PublicKey
+	log       zap.SugaredLogger
 }

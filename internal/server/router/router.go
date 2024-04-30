@@ -3,6 +3,7 @@
 package router
 
 import (
+	"fmt"
 	"github.com/ZnNr/go-musthave-metrics.git/internal/compressor"
 	"github.com/ZnNr/go-musthave-metrics.git/internal/flags"
 	"github.com/ZnNr/go-musthave-metrics.git/internal/handlers"
@@ -11,9 +12,11 @@ import (
 )
 
 // New возвращает новый экземпляр маршрутизатора с настроенными обработчиками для обработки HTTP запросов.
-func New(params flags.Params) *chi.Mux {
-	handler := handlers.New(params.DatabaseAddress, params.Key)
-
+func New(params flags.Params) (*chi.Mux, error) {
+	handler, err := handlers.New(params.DatabaseAddress, params.Key, params.CryptoKeyPath)
+	if err != nil {
+		return nil, fmt.Errorf("error while creating handler: %w", err)
+	}
 	r := chi.NewRouter()
 	r.Use(log.RequestLogger)
 	r.Use(compressor.HTTPCompressHandler)
@@ -25,5 +28,5 @@ func New(params flags.Params) *chi.Mux {
 	r.Get("/ping", handler.CheckDatabaseAvailability)
 	r.Post("/updates/", handler.SaveListMetricsFromJSONHandler)
 
-	return r
+	return r, nil
 }
