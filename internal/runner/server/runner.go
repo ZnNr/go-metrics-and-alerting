@@ -1,4 +1,4 @@
-package runner
+package server
 
 import (
 	"context"
@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"github.com/ZnNr/go-musthave-metrics.git/internal/collector"
 	"github.com/ZnNr/go-musthave-metrics.git/internal/flags"
-	log "github.com/ZnNr/go-musthave-metrics.git/internal/logger"
+	log "github.com/ZnNr/go-musthave-metrics.git/internal/middlewares/logger"
 	"github.com/ZnNr/go-musthave-metrics.git/internal/saver/database"
 	"github.com/ZnNr/go-musthave-metrics.git/internal/saver/file"
 	"github.com/ZnNr/go-musthave-metrics.git/internal/server/router"
@@ -93,7 +93,7 @@ func (r *Runner) Run(ctx context.Context) {
 		if err != nil {
 			r.logger.Error(err.Error(), "restore error")
 		}
-		collector.Collector.Metrics = metrics
+		collector.Collector().Metrics = metrics
 		r.logger.Info("metrics restored")
 	}
 
@@ -112,7 +112,7 @@ func (r *Runner) Run(ctx context.Context) {
 		sig := <-r.signals
 		r.logger.Info(fmt.Sprintf("got signal: %s", sig.String()))
 		// Сохранение метрик.
-		if err := r.saver.Save(ctx, collector.Collector.Metrics); err != nil {
+		if err := r.saver.Save(ctx, collector.Collector().Metrics); err != nil {
 			r.logger.Error(err.Error(), "save error")
 		} else {
 			r.logger.Info("metrics was successfully saved")
@@ -140,7 +140,7 @@ func (r *Runner) saveMetrics(ctx context.Context, interval int) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			if err := r.saver.Save(ctx, collector.Collector.Metrics); err != nil {
+			if err := r.saver.Save(ctx, collector.Collector().Metrics); err != nil {
 				r.logger.Error(err.Error(), "save error")
 			}
 		}

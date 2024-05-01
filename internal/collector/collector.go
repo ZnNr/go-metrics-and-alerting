@@ -15,9 +15,12 @@ var (
 	ErrNotFound = errors.New("not found")
 )
 
-// Collector Определен экземпляр структуры collector с именем Collector
-var Collector = collector{
+var metricsCollector = collector{
 	Metrics: make([]StoredMetric, 0),
+}
+
+func Collector() *collector {
+	return &metricsCollector
 }
 
 // Collect - метод добавления метрики из MetricRequest.

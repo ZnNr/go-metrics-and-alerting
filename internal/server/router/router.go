@@ -4,10 +4,10 @@ package router
 
 import (
 	"fmt"
-	"github.com/ZnNr/go-musthave-metrics.git/internal/compressor"
 	"github.com/ZnNr/go-musthave-metrics.git/internal/flags"
 	"github.com/ZnNr/go-musthave-metrics.git/internal/handlers"
-	log "github.com/ZnNr/go-musthave-metrics.git/internal/logger"
+	"github.com/ZnNr/go-musthave-metrics.git/internal/middlewares/compressor"
+	log "github.com/ZnNr/go-musthave-metrics.git/internal/middlewares/logger"
 	"github.com/go-chi/chi/v5"
 )
 
@@ -20,6 +20,7 @@ func New(params flags.Params) (*chi.Mux, error) {
 	r := chi.NewRouter()
 	r.Use(log.RequestLogger)
 	r.Use(compressor.HTTPCompressHandler)
+	r.Use(handler.CheckSubscriptionHandler)
 	r.Post("/update/", handler.SaveMetricFromJSONHandler)
 	r.Post("/value/", handler.GetMetricFromJSONHandler)
 	r.Post("/update/{type}/{name}/{value}", handler.SaveMetricHandler)

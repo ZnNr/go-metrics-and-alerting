@@ -192,16 +192,15 @@ func Init(opts ...Option) *Params {
 	return p
 }
 
-// Params содержит параметры приложения.
 type Params struct {
-	FlagRunAddr     string // Адрес и порт сервера
-	DatabaseAddress string // Адрес базы данных
-	ReportInterval  int    // Интервал отчетов
-	PollInterval    int    // Интервал опроса
-	StoreInterval   int    // Интервал сохранения
-	FileStoragePath string // Путь к хранилищу файлов
-	Restore         bool   // Флаг восстановления данных
-	Key             string // Ключ подписки
-	RateLimit       int    // Ограничение запросов
-	CryptoKeyPath   string // Путь к криптографическому ключу
+	FlagRunAddr     string `json:"address"`         // Адрес и порт сервера
+	DatabaseAddress string `json:"database_dsn"`    // Адрес базы данных
+	ReportInterval  int    `json:"report_interval"` // Интервал отчетов
+	PollInterval    int    `json:"poll_interval"`   // Интервал опроса
+	StoreInterval   int    `json:"store_interval"`  // Интервал сохранения
+	FileStoragePath string `json:"store_file"`      // Путь к хранилищу файлов
+	Restore         bool   `json:"restore"`         // Флаг восстановления данных
+	Key             string `json:"hash_key"`        // Ключ подписки
+	RateLimit       int    `json:"rate_limit"`      // Ограничение запросов
+	CryptoKeyPath   string `json:"crypto_key"`      // Путь к криптографическому ключу
 }

@@ -10,7 +10,7 @@ import (
 )
 
 // Restore восстанавливает состояние метрик из файла.
-func (m *manager) Restore(ctx context.Context) ([]collector.StoredMetric, error) {
+func (m *Manager) Restore(ctx context.Context) ([]collector.StoredMetric, error) {
 	file, err := os.OpenFile(m.fileName, os.O_RDONLY|os.O_CREATE, 0666)
 	if err != nil {
 		return nil, err
@@ -30,14 +30,15 @@ func (m *manager) Restore(ctx context.Context) ([]collector.StoredMetric, error)
 }
 
 // Save сохраняет состояние метрик в файл.
-func (m *manager) Save(ctx context.Context, metrics []collector.StoredMetric) error {
+func (m *Manager) Save(ctx context.Context, metrics []collector.StoredMetric) error {
+	var saveError error
 	file, err := os.OpenFile(m.fileName, os.O_WRONLY|os.O_CREATE, 0666)
 	if err != nil {
 		return err
 	}
 	defer func() {
-		if cerr := file.Close(); cerr != nil {
-			err = cerr
+		if err := file.Close(); err != nil {
+			saveError = err
 		}
 	}()
 
@@ -47,25 +48,23 @@ func (m *manager) Save(ctx context.Context, metrics []collector.StoredMetric) er
 	if err != nil {
 		return err
 	}
-	_, err = writer.Write(data)
-	if err != nil {
+	if _, err = writer.Write(data); err != nil {
 		return err
 	}
-
 	if err = writer.WriteByte('\n'); err != nil {
 		return err
 	}
 	if err = writer.Flush(); err != nil {
 		return err
 	}
-	return nil
+	return saveError
 }
 
 // New создает новый менеджер для работы с файлами.
-func New(path string) *manager {
-	return &manager{fileName: path}
+func New(path string) *Manager {
+	return &Manager{fileName: path}
 }
 
-type manager struct {
+type Manager struct {
 	fileName string
 }

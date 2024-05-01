@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 	"github.com/ZnNr/go-musthave-metrics.git/internal/flags"
-	"github.com/ZnNr/go-musthave-metrics.git/internal/server/runner"
+	"github.com/ZnNr/go-musthave-metrics.git/internal/runner/server"
 )
 
 func main() {
@@ -24,6 +24,7 @@ func main() {
 	defer cancel()
 
 	// Восстановление предыдущих метрик.
-	serverRunner := runner.New(params)
+	serverRunner := server.New(params)
+
 	serverRunner.Run(ctx)
 }
