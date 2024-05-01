@@ -10,6 +10,9 @@ import (
 	"github.com/ZnNr/go-musthave-metrics.git/internal/storage"
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
+	"os"
+	"os/signal"
+	"syscall"
 )
 
 func main() {
@@ -22,6 +25,10 @@ func main() {
 		flags.WithRateLimit(),
 		flags.WithTLSKeyPath(),
 	)
+
+	sigs := make(chan os.Signal, 1)                                       // Создание канала sigs для обработки сигналов SIGTERM, SIGINT и SIGQUIT.
+	signal.Notify(sigs, syscall.SIGTERM, syscall.SIGINT, syscall.SIGQUIT) // Функция signal.Notify() используется для регистрации указанных сигналов на канале sigs.
+
 	// Создание контекста и группы ошибок.
 	errGroup, ctx := errgroup.WithContext(context.Background())
 	// Создание логгера.

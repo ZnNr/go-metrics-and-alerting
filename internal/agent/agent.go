@@ -47,7 +47,7 @@ func (a *Agent) CollectMetrics(ctx context.Context) (err error) {
 }
 
 // SendMetrics — метод отправки метрик на сервер по таймеру
-func (a *Agent) SendMetrics(ctx context.Context) error {
+func (a *Agent) SendMetrics(ctx context.Context) (err error) {
 	numRequests := make(chan struct{}, a.params.RateLimit)
 	reportTicker := time.NewTicker(time.Duration(a.params.ReportInterval) * time.Second)
 	client := resty.New()
