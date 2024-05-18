@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"github.com/ZnNr/go-musthave-metrics.git/internal/flags"
 	"github.com/ZnNr/go-musthave-metrics.git/internal/runner/server"
 )
@@ -17,7 +18,9 @@ func main() {
 		flags.WithDatabase(),
 		flags.WithKey(),
 		flags.WithTLSKeyPath(),
+		flags.WithTrustedSubnet(),
 	)
+	fmt.Println(params)
 
 	// Создание контекста для возможности отмены операций.
 	ctx, cancel := context.WithCancel(context.Background())

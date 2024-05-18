@@ -29,6 +29,15 @@ const (
 // Option - функция, которая изменяет поля структуры параметров
 type Option func(params *Params)
 
+func WithTrustedSubnet() Option {
+	return func(p *Params) {
+		flag.StringVar(&p.TrustedSubnet, "t", p.TrustedSubnet, "trusted subnet")
+		if envTrustedSubnet := os.Getenv("TRUSTED_SUBNET"); envTrustedSubnet != "" {
+			p.TrustedSubnet = envTrustedSubnet
+		}
+	}
+}
+
 // WithRateLimit создает опцию для установки ограничения запросов.
 func WithRateLimit() Option {
 	return func(p *Params) {
@@ -203,4 +212,5 @@ type Params struct {
 	Key             string `json:"hash_key"`        // Ключ подписки
 	RateLimit       int    `json:"rate_limit"`      // Ограничение запросов
 	CryptoKeyPath   string `json:"crypto_key"`      // Путь к криптографическому ключу
+	TrustedSubnet   string `json:"trusted_subnet"`  // доверенная подсеть
 }

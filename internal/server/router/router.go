@@ -13,7 +13,12 @@ import (
 
 // New возвращает новый экземпляр маршрутизатора с настроенными обработчиками для обработки HTTP запросов.
 func New(params flags.Params) (*chi.Mux, error) {
-	handler, err := handlers.New(params.DatabaseAddress, params.Key, params.CryptoKeyPath)
+	handler, err := handlers.New(
+		params.DatabaseAddress,
+		params.Key,
+		params.CryptoKeyPath,
+		params.TrustedSubnet,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("error while creating handler: %w", err)
 	}
@@ -21,6 +26,7 @@ func New(params flags.Params) (*chi.Mux, error) {
 	r.Use(log.RequestLogger)
 	r.Use(compressor.HTTPCompressHandler)
 	r.Use(handler.CheckSubscriptionHandler)
+	r.Use(handler.CheckSubnet)
 	r.Post("/update/", handler.SaveMetricFromJSONHandler)
 	r.Post("/value/", handler.GetMetricFromJSONHandler)
 	r.Post("/update/{type}/{name}/{value}", handler.SaveMetricHandler)

@@ -16,6 +16,7 @@ import (
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"html/template"
 	"io"
+	"net"
 	"net/http"
 	"os"
 	"strconv"
@@ -249,6 +250,22 @@ func (h *Handler) CheckSubscriptionHandler(hh http.Handler) http.Handler {
 	return http.HandlerFunc(checkFn)
 }
 
+func (h *Handler) CheckSubnet(hh http.Handler) http.Handler {
+	checkSubnetFn := func(w http.ResponseWriter, r *http.Request) {
+		if h.trustedSubnet != "" {
+			realIP := r.Header.Get("X-Real-IP")
+			_, ipnet, _ := net.ParseCIDR(h.trustedSubnet)
+
+			if !ipnet.Contains(net.ParseIP(realIP)) {
+				w.WriteHeader(http.StatusForbidden)
+				return
+			}
+		}
+		hh.ServeHTTP(w, r)
+	}
+	return http.HandlerFunc(checkSubnetFn)
+}
+
 // collectMetric - метод для сохранения метрики.
 func (h *Handler) collectMetric(metric collector.MetricRequest) ([]byte, error) {
 	c := collector.Collector()
@@ -313,10 +330,11 @@ func (h *Handler) getHash(body []byte) string {
 }
 
 // New - функция создания нового экземпляра Handler.
-func New(db string, key string, cryptoKey string) (*Handler, error) {
+func New(db string, key string, cryptoKey string, trustedSubnet string) (*Handler, error) {
 	handler := &Handler{
-		dbAddress: db,
-		key:       key,
+		dbAddress:     db,
+		key:           key,
+		trustedSubnet: trustedSubnet,
 	}
 	if cryptoKey != "" {
 		b, err := os.ReadFile(cryptoKey)
@@ -336,7 +354,8 @@ func New(db string, key string, cryptoKey string) (*Handler, error) {
 // Handler - структура, представляющая обработчик запросов.
 // Она содержит методы для сохранения метрик, получения метрик, проверки доступности базы данных и другие.
 type Handler struct {
-	dbAddress string
-	key       string
-	cryptoKey *rsa.PrivateKey
+	dbAddress     string
+	trustedSubnet string
+	key           string
+	cryptoKey     *rsa.PrivateKey
 }

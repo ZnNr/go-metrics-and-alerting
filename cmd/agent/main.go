@@ -12,7 +12,8 @@ func main() {
 		flags.WithConfig(),
 		flags.WithPollInterval(),
 		flags.WithReportInterval(),
-		flags.WithAddr(), flags.WithKey(),
+		flags.WithAddr(),
+		flags.WithKey(),
 		flags.WithRateLimit(),
 		flags.WithTLSKeyPath(),
 	)
