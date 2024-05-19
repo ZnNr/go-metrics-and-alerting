@@ -5,7 +5,7 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
-	"github.com/ZnNr/go-musthave-metrics.git/internal/collector"
+	"github.com/ZnNr/go-musthave-metrics.git/internal/agent/collector"
 	"os"
 )
 

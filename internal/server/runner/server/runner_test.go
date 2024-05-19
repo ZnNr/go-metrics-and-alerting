@@ -3,7 +3,7 @@ package server
 import (
 	"context"
 	"fmt"
-	"github.com/ZnNr/go-musthave-metrics.git/internal/collector"
+	"github.com/ZnNr/go-musthave-metrics.git/internal/agent/collector"
 	"github.com/ZnNr/go-musthave-metrics.git/internal/flags"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"

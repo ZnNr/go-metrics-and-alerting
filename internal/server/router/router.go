@@ -5,9 +5,9 @@ package router
 import (
 	"fmt"
 	"github.com/ZnNr/go-musthave-metrics.git/internal/flags"
-	"github.com/ZnNr/go-musthave-metrics.git/internal/handlers"
-	"github.com/ZnNr/go-musthave-metrics.git/internal/middlewares/compressor"
-	log "github.com/ZnNr/go-musthave-metrics.git/internal/middlewares/logger"
+	"github.com/ZnNr/go-musthave-metrics.git/internal/server/handlers"
+	"github.com/ZnNr/go-musthave-metrics.git/internal/server/middlewares/compressor"
+	log "github.com/ZnNr/go-musthave-metrics.git/internal/server/middlewares/logger"
 	"github.com/go-chi/chi/v5"
 )
 

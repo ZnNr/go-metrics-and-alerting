@@ -94,7 +94,7 @@ func (c *collector) GetMetric(metricName string) (StoredMetric, error) {
 }
 
 // GetAvailableMetrics Метод возвращает слайс со всеми доступными метриками.
-// Внутри метода перебираются элементы счетчиков и показателей в объекте "storage" и добавляются в срез.
+// Внутри метода перебираются элементы счетчиков и показателей в объекте "metrics" и добавляются в срез.
 func (c *collector) GetAvailableMetrics() []string {
 	names := make([]string, 0, len(c.Metrics))
 	for _, m := range c.Metrics {

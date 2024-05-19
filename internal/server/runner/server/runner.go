@@ -4,13 +4,17 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"github.com/ZnNr/go-musthave-metrics.git/internal/collector"
+	collector "github.com/ZnNr/go-musthave-metrics.git/internal/agent/collector"
 	"github.com/ZnNr/go-musthave-metrics.git/internal/flags"
-	log "github.com/ZnNr/go-musthave-metrics.git/internal/middlewares/logger"
-	"github.com/ZnNr/go-musthave-metrics.git/internal/saver/database"
-	"github.com/ZnNr/go-musthave-metrics.git/internal/saver/file"
+	serverGRPC "github.com/ZnNr/go-musthave-metrics.git/internal/server/grpc"
+	log "github.com/ZnNr/go-musthave-metrics.git/internal/server/middlewares/logger"
 	"github.com/ZnNr/go-musthave-metrics.git/internal/server/router"
+	"github.com/ZnNr/go-musthave-metrics.git/internal/server/saver/database"
+	"github.com/ZnNr/go-musthave-metrics.git/internal/server/saver/file"
+	pb "github.com/ZnNr/go-musthave-metrics.git/proto"
 	"go.uber.org/zap"
+	"google.golang.org/grpc"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -33,37 +37,39 @@ type Runner struct {
 	isRestore       bool
 	storeInterval   int
 	tlsKey          string
-	appSrv          server
-	pprofSrv        server
+	appSrv          httpServer
+	pprofSrv        httpServer
+	grpcServer      grpcServer
+	listener        listener
 	logger          *zap.SugaredLogger
 	signals         chan os.Signal
 }
 
 // New создает экземпляр Runner с использованием параметров flags.Params.
 func New(params *flags.Params) *Runner {
-	// init logger
+	// Инициализация логгера.
 	logger, err := zap.NewDevelopment()
 	if err != nil {
-		fmt.Println("error while creating logger, exit")
+		fmt.Println("error while creating logger, exit") //сообщаем об ошибки пакетом fmt потому что логгер не создался
 		return nil
 	}
 	defer logger.Sync()
 	log.SugarLogger = *logger.Sugar()
 
-	// init saver (file or db)
+	// Инициализация saver (файл или база данных).
 	saver, err := initSaver(params)
 	if err != nil {
 		log.SugarLogger.Fatalw(err.Error(), "error", "init metrics saver")
 	}
-
-	// init router
+	// Инициализация роутера.
 	r, err := router.New(*params)
 	if err != nil {
 		log.SugarLogger.Fatalw(err.Error(), "error", "creating router")
 	}
 	sigs := make(chan os.Signal, 1)
 	signal.Notify(sigs, syscall.SIGTERM, syscall.SIGINT, syscall.SIGQUIT)
-	return &Runner{
+
+	runner := &Runner{
 		saver:           saver,
 		metricsInterval: time.Duration(params.StoreInterval),
 		isRestore:       params.Restore,
@@ -80,6 +86,22 @@ func New(params *flags.Params) *Runner {
 		signals: sigs,
 		logger:  &log.SugarLogger,
 	}
+	if !params.DisableGrpc {
+		// Создание gRPC сервера.
+		s := grpc.NewServer()
+		// Регистрация gRPC сервера.
+		pb.RegisterMetricsServer(s, &serverGRPC.MetricsServer{})
+
+		listen, err := net.Listen("tcp", params.GrpcRunAddr)
+		if err != nil {
+			log.SugarLogger.Fatalw(err.Error(), "event", "start listen tcp")
+		}
+
+		runner.listener = listen
+		runner.grpcServer = s
+	}
+
+	return runner
 }
 
 // Run запускает основной цикл приложения, обрабатывая сохранение метрик, pprof и сигналы.
@@ -103,7 +125,7 @@ func (r *Runner) Run(ctx context.Context) {
 	// Запуск pprof.
 	go func() {
 		if err := r.pprofSrv.ListenAndServe(); err != nil {
-			r.logger.Fatalw(err.Error(), "pprof", "start pprof server")
+			r.logger.Fatalw(err.Error(), "pprof", "start pprof httpServer")
 		}
 	}()
 
@@ -111,30 +133,42 @@ func (r *Runner) Run(ctx context.Context) {
 	go func() {
 		sig := <-r.signals
 		r.logger.Info(fmt.Sprintf("got signal: %s", sig.String()))
-		// Сохранение метрик.
+		// save metrics
 		if err := r.saver.Save(ctx, collector.Collector().Metrics); err != nil {
 			r.logger.Error(err.Error(), "save error")
 		} else {
 			r.logger.Info("metrics was successfully saved")
 		}
-		// Graceful shutdown.
+		// gracefully shutdown
 		if err := r.appSrv.Shutdown(ctx); err != nil {
-			r.logger.Error(fmt.Sprintf("error while server shutdown: %s", err.Error()), "server shutdown error")
+			r.logger.Error(fmt.Sprintf("error while httpServer shutdown: %s", err.Error()), "httpServer shutdown error")
 			return
 		}
 	}()
 
-	// Запуск сервера.
-	r.logger.Info("Starting server")
+	// Запуск gRPC сервера.
+	if r.grpcServer != nil {
+		go func() {
+			r.logger.Info("Starting gRPC httpServer")
+
+			if err := r.grpcServer.Serve(r.listener); err != nil {
+				r.logger.Errorf("error while serving grpc server: %s", err.Error())
+			}
+			defer r.grpcServer.GracefulStop()
+			defer r.listener.Close()
+		}()
+	}
+
+	// Запуск http httpServer.
+	r.logger.Info("Starting http httpServer")
 	if err := r.appSrv.ListenAndServe(); err != nil {
-		r.logger.Fatalw(err.Error(), "event", "start server")
+		r.logger.Fatalw(err.Error(), "event", "start http httpServer")
 	}
 }
 
 // saveMetrics сохраняет метрики с указанным интервалом.
 func (r *Runner) saveMetrics(ctx context.Context, interval int) {
 	ticker := time.NewTicker(time.Duration(interval))
-	defer ticker.Stop()
 	for {
 		select {
 		case <-ctx.Done():
@@ -171,18 +205,27 @@ func initFileSaver(fileStoragePath string) saver {
 	return file.New(fileStoragePath)
 }
 
-// saver - интерфейс для работы с метриками.
-//
 //go:generate mockery --inpackage --disable-version-string --filename saver_mock.go --name saver
 type saver interface {
 	Restore(ctx context.Context) ([]collector.StoredMetric, error)
 	Save(ctx context.Context, metrics []collector.StoredMetric) error
 }
 
-// server - интерфейс для работы с HTTP-сервером.
-//
-//go:generate mockery --inpackage --disable-version-string --filename server_mock.go --name server
-type server interface {
+//go:generate mockery --inpackage --disable-version-string --filename http_server_mock.go --name httpServer
+type httpServer interface {
 	ListenAndServe() error
 	Shutdown(ctx context.Context) error
+}
+
+//go:generate mockery --inpackage --disable-version-string --filename grpc_server_mock.go --name grpcServer
+type grpcServer interface {
+	Serve(lis net.Listener) error
+	GracefulStop()
+}
+
+//go:generate mockery --inpackage --disable-version-string --filename listener_mock.go --name listener
+type listener interface {
+	Close() error
+	Accept() (net.Conn, error)
+	Addr() net.Addr
 }

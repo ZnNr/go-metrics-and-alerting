@@ -14,9 +14,9 @@ import (
 	"encoding/json"
 	"encoding/pem"
 	"fmt"
-	"github.com/ZnNr/go-musthave-metrics.git/internal/collector"
+	collector2 "github.com/ZnNr/go-musthave-metrics.git/internal/agent/collector"
+	"github.com/ZnNr/go-musthave-metrics.git/internal/agent/metrics"
 	"github.com/ZnNr/go-musthave-metrics.git/internal/flags"
-	"github.com/ZnNr/go-musthave-metrics.git/internal/storage"
 	"github.com/avast/retry-go"
 	"github.com/go-resty/resty/v2"
 	"go.uber.org/zap"
@@ -80,8 +80,8 @@ func (a *Agent) sendMetrics(client *resty.Client) error {
 		SetHeader("Content-Encoding", "gzip").
 		SetHeader("X-Real-IP", "173.17.0.2")
 
-	for _, v := range collector.Collector().Metrics {
-		jsonInput, _ := json.Marshal(collector.MetricRequest{
+	for _, v := range collector2.Collector().Metrics {
+		jsonInput, _ := json.Marshal(collector2.MetricRequest{
 			ID:    v.ID,
 			MType: v.MType,
 			Delta: v.CounterValue,
@@ -132,7 +132,7 @@ func (a *Agent) sendRequestsWithRetries(req *resty.Request, jsonInput string) er
 }
 
 // New - функция для создания нового экземпляра Agent.
-func New(params *flags.Params, storage *storage.Storage, log *zap.SugaredLogger) (*Agent, error) {
+func New(params *flags.Params, storage *metrics.Storage, log *zap.SugaredLogger) (*Agent, error) {
 	agent := &Agent{
 		params:  params,
 		storage: storage,
@@ -157,7 +157,7 @@ func New(params *flags.Params, storage *storage.Storage, log *zap.SugaredLogger)
 // Agent - структура, представляющая агента.
 type Agent struct {
 	params    *flags.Params
-	storage   *storage.Storage
+	storage   *metrics.Storage
 	cryptoKey *rsa.PublicKey
 	log       *zap.SugaredLogger
 	client    *resty.Client
