@@ -250,19 +250,23 @@ func (h *Handler) CheckSubscriptionHandler(hh http.Handler) http.Handler {
 	return http.HandlerFunc(checkFn)
 }
 
-func (h *Handler) CheckSubnet(hh http.Handler) http.Handler {
+// CheckSubnetHandler возвращает обработчик, который проверяет, принадлежит ли входящий IP-адрес доверенной подсети.
+func (h *Handler) CheckSubnetHandler(hh http.Handler) http.Handler {
+	// Функция checkSubnetFn выполняет проверку подсети перед обработкой запроса.
 	checkSubnetFn := func(w http.ResponseWriter, r *http.Request) {
+		// Проверяем, установлена ли доверенная подсеть.
 		if h.trustedSubnet != "" {
-			realIP := r.Header.Get("X-Real-IP")
-			_, ipnet, _ := net.ParseCIDR(h.trustedSubnet)
-
+			realIP := r.Header.Get("X-Real-IP")           // Получаем реальный IP-адрес из заголовка запроса.
+			_, ipnet, _ := net.ParseCIDR(h.trustedSubnet) // Разбираем доверенную подсеть для сравнения.
+			// Проверяем, принадлежит ли реальный IP-адрес доверенной подсети.
 			if !ipnet.Contains(net.ParseIP(realIP)) {
-				w.WriteHeader(http.StatusForbidden)
+				w.WriteHeader(http.StatusForbidden) // Возвращаем статус "Forbidden", если IP не принадлежит доверенной подсети.
 				return
 			}
 		}
-		hh.ServeHTTP(w, r)
+		hh.ServeHTTP(w, r) // Если IP принадлежит доверенной подсети, передаем управление следующему обработчику.
 	}
+	// Возвращаем обработчик, который будет выполнять проверку доверенной подсети перед вызовом переданного обработчика.
 	return http.HandlerFunc(checkSubnetFn)
 }
 

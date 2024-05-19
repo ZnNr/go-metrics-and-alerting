@@ -29,6 +29,7 @@ const (
 // Option - функция, которая изменяет поля структуры параметров
 type Option func(params *Params)
 
+// WithTrustedSubnet возвращает опцию для установки доверенной подсети.
 func WithTrustedSubnet() Option {
 	return func(p *Params) {
 		flag.StringVar(&p.TrustedSubnet, "t", p.TrustedSubnet, "trusted subnet")

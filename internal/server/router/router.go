@@ -26,7 +26,7 @@ func New(params flags.Params) (*chi.Mux, error) {
 	r.Use(log.RequestLogger)
 	r.Use(compressor.HTTPCompressHandler)
 	r.Use(handler.CheckSubscriptionHandler)
-	r.Use(handler.CheckSubnet)
+	r.Use(handler.CheckSubnetHandler)
 	r.Post("/update/", handler.SaveMetricFromJSONHandler)
 	r.Post("/value/", handler.GetMetricFromJSONHandler)
 	r.Post("/update/{type}/{name}/{value}", handler.SaveMetricHandler)
