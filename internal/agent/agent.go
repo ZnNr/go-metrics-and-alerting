@@ -56,7 +56,7 @@ func (a *Agent) SendMetricsLoop(ctx context.Context) (err error) {
 
 	if a.params.GrpcRunAddr != "" {
 		// Устанавливаем соединение с сервером
-		conn, err := grpc.DialContext(ctx, a.params.GrpcRunAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+		conn, err := grpc.NewClient(a.params.GrpcRunAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 		if err != nil {
 			return err
 		}
