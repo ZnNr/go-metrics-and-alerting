@@ -13,18 +13,18 @@ import (
 const (
 	defaultRateLimit = 1
 	// Адрес и порт сервера по умолчанию
-	defaultAddr     string = "localhost:8080"
-	defaultGrpcAddr string = "127.0.0.1:3200"
+	defaultAddr     = "localhost:8080"
+	defaultGrpcAddr = "127.0.0.1:3200"
 	// Интервал отчетов по умолчанию (в секундах)
-	defaultReportInterval int = 5
+	defaultReportInterval = 5
 	// Интервал опроса по умолчанию (в секундах)
-	defaultPollInterval int = 1
+	defaultPollInterval = 1
 	// Интервал сохранения по умолчанию (в секундах)
-	defaultStoreInterval int = 15
+	defaultStoreInterval = 15
 	// Путь к файлу хранения по умолчанию
-	defaultFileStoragePath string = "/tmp/metrics-db.json"
+	defaultFileStoragePath = "/tmp/metrics-db.json"
 	// Восстанавливать состояние по умолчанию или нет
-	defaultRestore bool = true
+	defaultRestore = true
 )
 
 // Option - функция, которая изменяет поля структуры параметров

@@ -20,13 +20,15 @@ func New(params flags.Params) (*chi.Mux, error) {
 		params.TrustedSubnet,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("error while creating handler: %w", err)
+		return nil, fmt.Errorf("error while creating handler: %v", err)
 	}
 	r := chi.NewRouter()
 	r.Use(log.RequestLogger)
 	r.Use(compressor.HTTPCompressHandler)
 	r.Use(handler.CheckSubscriptionHandler)
-	r.Use(handler.CheckSubnetHandler)
+	if params.TrustedSubnet != "" {
+		r.Use(handler.CheckSubnetHandler)
+	}
 	r.Post("/update/", handler.SaveMetricFromJSONHandler)
 	r.Post("/value/", handler.GetMetricFromJSONHandler)
 	r.Post("/update/{type}/{name}/{value}", handler.SaveMetricHandler)

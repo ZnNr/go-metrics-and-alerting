@@ -255,12 +255,12 @@ func (h *Handler) CheckSubnetHandler(hh http.Handler) http.Handler {
 	// Функция checkSubnetFn выполняет проверку подсети перед обработкой запроса.
 	checkSubnetFn := func(w http.ResponseWriter, r *http.Request) {
 		// Проверяем, установлена ли доверенная подсеть.
-		if h.trustedSubnet != "" {
-			realIP := r.Header.Get("X-Real-IP")           // Получаем реальный IP-адрес из заголовка запроса.
-			_, ipnet, _ := net.ParseCIDR(h.trustedSubnet) // Разбираем доверенную подсеть для сравнения.
+		if h.trustedIPNet != nil {
+			realIP := r.Header.Get("X-Real-IP") // Получаем реальный IP-адрес из заголовка запроса.
+			clientIP := net.ParseIP(realIP)
 			// Проверяем, принадлежит ли реальный IP-адрес доверенной подсети.
-			if !ipnet.Contains(net.ParseIP(realIP)) {
-				w.WriteHeader(http.StatusForbidden) // Возвращаем статус "Forbidden", если IP не принадлежит доверенной подсети.
+			if !h.trustedIPNet.Contains(clientIP) {
+				w.WriteHeader(http.StatusForbidden)
 				return
 			}
 		}
@@ -340,6 +340,13 @@ func New(db string, key string, cryptoKey string, trustedSubnet string) (*Handle
 		key:           key,
 		trustedSubnet: trustedSubnet,
 	}
+	if trustedSubnet != "" {
+		_, ipnet, err := net.ParseCIDR(trustedSubnet)
+		if err != nil {
+			return nil, fmt.Errorf("error parsing trusted subnet: %v", err)
+		}
+		handler.trustedIPNet = ipnet
+	}
 	if cryptoKey != "" {
 		b, err := os.ReadFile(cryptoKey)
 		if err != nil {
@@ -360,6 +367,7 @@ func New(db string, key string, cryptoKey string, trustedSubnet string) (*Handle
 type Handler struct {
 	dbAddress     string
 	trustedSubnet string
+	trustedIPNet  *net.IPNet // Добавьте новое поле для хранения IP-подсети
 	key           string
 	cryptoKey     *rsa.PrivateKey
 }

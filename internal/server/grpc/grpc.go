@@ -4,6 +4,7 @@ import (
 	"context"
 	"github.com/ZnNr/go-musthave-metrics.git/internal/agent/collector"
 	pb "github.com/ZnNr/go-musthave-metrics.git/proto"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"log"
 	"strconv"
@@ -29,20 +30,20 @@ func (s *MetricsServer) SaveMetricFromJSON(ctx context.Context, in *pb.MetricReq
 		metricValue = strconv.Itoa(int(in.Delta))
 		metric.Delta = &in.Delta
 	case collector.Gauge:
-		metricValue = strconv.FormatFloat(in.Value, 'f', 11, 64)
+		metricValue = strconv.FormatFloat(in.Value, 'f', -1, 64)
 		metric.Value = &in.Value
 	default:
 		// Возвращаем ошибку, если тип метрики не поддерживается.
 		return &pb.SaveMetricResponse{
 			ResultJSON: nil,
-		}, status.Error(1, collector.ErrNotImplemented.Error())
+		}, status.Error(codes.Unimplemented, collector.ErrNotImplemented.Error())
 	}
 
 	if err := c.Collect(metric, metricValue); err != nil {
 		// Возвращаем ошибку, если коллектор не смог собрать метрику.
 		return &pb.SaveMetricResponse{
 			ResultJSON: nil,
-		}, status.Error(1, err.Error())
+		}, status.Error(codes.Internal, err.Error())
 	}
 
 	// Получаем сохраненную метрику в формате JSON для ответа.
@@ -51,7 +52,7 @@ func (s *MetricsServer) SaveMetricFromJSON(ctx context.Context, in *pb.MetricReq
 		// Возвращаем ошибку, если не удалось получить метрику в формате JSON.
 		return &pb.SaveMetricResponse{
 			ResultJSON: nil,
-		}, status.Error(1, err.Error())
+		}, status.Error(codes.Internal, err.Error())
 	}
 	log.Println(string(resultJSON))
 	return &pb.SaveMetricResponse{

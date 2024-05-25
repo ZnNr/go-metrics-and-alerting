@@ -66,7 +66,7 @@ func (r *Runner) Run(ctx context.Context) {
 	// send metrics on server by timer internally
 	wg.Add(1)
 	go func() {
-		if err = agent.SendMetrics(runCtx); err != nil {
+		if err = agent.SendMetricsLoop(runCtx); err != nil {
 			r.logger.Errorf("send metrics loop exited with error: %s", err.Error())
 			wg.Done()
 			cancel()
@@ -79,7 +79,7 @@ func (r *Runner) Run(ctx context.Context) {
 	go func() {
 		sig := <-r.signals
 		r.logger.Info(fmt.Sprintf("got signal: %s", sig.String()))
-		if err = agent.SendMetrics(runCtx); err != nil {
+		if err = agent.SendMetricsLoop(runCtx); err != nil {
 			r.logger.Errorf("send metrics after signal %q exited with error: %s", sig.String(), err.Error())
 		} else {
 			r.logger.Infof("metrics successfully sent after signal %q", sig.String())
