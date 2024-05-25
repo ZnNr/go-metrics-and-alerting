@@ -55,8 +55,8 @@ func (a *Agent) SendMetricsLoop(ctx context.Context) (err error) {
 	defer reportTicker.Stop()
 
 	if a.params.GrpcRunAddr != "" {
-		// устанавливаем соединение с сервером
-		conn, err := grpc.Dial(a.params.GrpcRunAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+		// Устанавливаем соединение с сервером
+		conn, err := grpc.DialContext(ctx, a.params.GrpcRunAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 		if err != nil {
 			return err
 		}
@@ -69,26 +69,23 @@ func (a *Agent) SendMetricsLoop(ctx context.Context) (err error) {
 		case <-ctx.Done():
 			a.log.Warn("Sending of metrics stopped")
 			return nil
-		// проверяем, пришло ли время отправлять метрики на сервер
 		case <-reportTicker.C:
 			select {
 			case <-ctx.Done():
 				a.log.Info("reportTicker.C triggered")
 				return nil
-			// проверяем, превышен ли лимит
 			case numRequests <- struct{}{}:
-				if err = a.SendMetricsLoop(ctx); err != nil {
+				if err = a.SendMetrics(ctx); err != nil {
 					return err
 				}
 			default:
 				a.log.Info("rate limit is exceeded")
 			}
 		}
-		//<-numRequests
 	}
 }
 
-// SendMetrics - a method that encapsulates the logic for sending a http request to the server.
+// SendMetrics - метод для отправки метрик
 func (a *Agent) SendMetrics(ctx context.Context) error {
 	if err := a.sendHTTP(ctx); err != nil {
 		return err
@@ -118,7 +115,6 @@ func (a *Agent) sendGrpc(ctx context.Context) error {
 
 		if _, err := a.grpcMetricsClient.SaveMetricFromJSON(ctx, &request); err != nil {
 			return errors.Errorf("error while sending metric to grpc server: %s", err.Error())
-
 		}
 	}
 	return nil
@@ -131,7 +127,7 @@ func (a *Agent) sendHTTP(ctx context.Context) error {
 		SetHeader("Accept-Encoding", "gzip").
 		SetHeader("Content-Encoding", "gzip").
 		SetContext(ctx)
-	a.SetRealIPFromRequest(ctx, req) // Вызываем метод SetRealIPFromRequest для сохранения реального IP-адреса клиента
+	a.SetRealIPFromRequest(req) // Вызываем метод SetRealIPFromRequest для сохранения реального IP-адреса клиента
 
 	var wg sync.WaitGroup
 
@@ -176,12 +172,12 @@ func (a *Agent) sendHTTP(ctx context.Context) error {
 }
 
 // SetRealIPFromRequest - метод для извлечения реального IP-адреса из заголовка запроса и сохранения его.
-func (a *Agent) SetRealIPFromRequest(ctx context.Context, req *resty.Request) {
+func (a *Agent) SetRealIPFromRequest(req *resty.Request) {
 	realIP := req.Header.Get("X-Real-IP")
 	a.realIP = realIP
 }
 
-// sendHTTP — метод, реализующий логику отправки запроса с повторами.
+// sendRequestsWithRetries — метод, реализующий логику отправки запроса с повторами.
 func (a *Agent) sendRequestsWithRetries(req *resty.Request, jsonInput string) error {
 	buf := bytes.NewBuffer(nil)
 	zb := gzip.NewWriter(buf)
