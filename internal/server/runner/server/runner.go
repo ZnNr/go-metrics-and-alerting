@@ -4,7 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	collector "github.com/ZnNr/go-musthave-metrics.git/internal/agent/collector"
+	"github.com/ZnNr/go-musthave-metrics.git/internal/agent/collector"
 	"github.com/ZnNr/go-musthave-metrics.git/internal/flags"
 	serverGRPC "github.com/ZnNr/go-musthave-metrics.git/internal/server/grpc"
 	log "github.com/ZnNr/go-musthave-metrics.git/internal/server/middlewares/logger"

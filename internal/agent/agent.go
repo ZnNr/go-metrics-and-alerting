@@ -174,7 +174,7 @@ func (a *Agent) sendHTTP(ctx context.Context) error {
 // SetRealIPFromRequest - метод для извлечения реального IP-адреса из заголовка запроса и сохранения его.
 func (a *Agent) SetRealIPFromRequest(req *resty.Request) {
 	realIP := req.Header.Get("X-Real-IP")
-	a.realIP = realIP
+	a.RealIP = realIP
 }
 
 // sendRequestsWithRetries — метод, реализующий логику отправки запроса с повторами.
@@ -235,5 +235,5 @@ type Agent struct {
 	log               *zap.SugaredLogger
 	client            *resty.Client
 	grpcMetricsClient pb.MetricsClient
-	realIP            string // Добавляем поле для хранения реального IP-адреса клиента
+	RealIP            string // Добавляем поле для хранения реального IP-адреса клиента
 }
