@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 	"github.com/ZnNr/go-musthave-metrics.git/internal/flags"
-	"github.com/ZnNr/go-musthave-metrics.git/internal/runner/server"
+	serverRunner "github.com/ZnNr/go-musthave-metrics.git/internal/server/runner/server"
 )
 
 func main() {
@@ -17,6 +17,9 @@ func main() {
 		flags.WithDatabase(),
 		flags.WithKey(),
 		flags.WithTLSKeyPath(),
+		flags.WithTrustedSubnet(),
+		flags.WithGrpc(),
+		flags.WithGrpcAddr(),
 	)
 
 	// Создание контекста для возможности отмены операций.
@@ -24,7 +27,7 @@ func main() {
 	defer cancel()
 
 	// Восстановление предыдущих метрик.
-	serverRunner := server.New(params)
+	runner := serverRunner.New(params)
 
-	serverRunner.Run(ctx)
+	runner.Run(ctx)
 }

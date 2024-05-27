@@ -5,7 +5,7 @@ package server
 import (
 	context "context"
 
-	collector "github.com/ZnNr/go-musthave-metrics.git/internal/collector"
+	collector "github.com/ZnNr/go-musthave-metrics.git/internal/agent/collector"
 
 	mock "github.com/stretchr/testify/mock"
 )

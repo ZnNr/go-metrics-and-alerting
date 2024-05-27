@@ -1,12 +1,12 @@
-package agent
+package runner
 
 import (
 	"context"
 	"fmt"
 	metricagent "github.com/ZnNr/go-musthave-metrics.git/internal/agent"
-	"github.com/ZnNr/go-musthave-metrics.git/internal/collector"
+	"github.com/ZnNr/go-musthave-metrics.git/internal/agent/collector"
+	"github.com/ZnNr/go-musthave-metrics.git/internal/agent/metrics"
 	"github.com/ZnNr/go-musthave-metrics.git/internal/flags"
-	"github.com/ZnNr/go-musthave-metrics.git/internal/storage"
 	"go.uber.org/zap"
 	"os"
 	"os/signal"
@@ -51,7 +51,7 @@ func (r *Runner) Run(ctx context.Context) {
 	var wg sync.WaitGroup
 
 	// Создание экземпляра metricagent.
-	agent, err := metricagent.New(r.params, storage.New(collector.Collector()), r.logger)
+	agent, err := metricagent.New(r.params, metrics.New(collector.Collector()), r.logger)
 	if err != nil {
 		r.logger.Fatalw(err.Error(), "error", "creating agent")
 	}
@@ -66,7 +66,7 @@ func (r *Runner) Run(ctx context.Context) {
 	// send metrics on server by timer internally
 	wg.Add(1)
 	go func() {
-		if err = agent.SendMetrics(runCtx); err != nil {
+		if err = agent.SendMetricsLoop(runCtx); err != nil {
 			r.logger.Errorf("send metrics loop exited with error: %s", err.Error())
 			wg.Done()
 			cancel()
@@ -79,7 +79,7 @@ func (r *Runner) Run(ctx context.Context) {
 	go func() {
 		sig := <-r.signals
 		r.logger.Info(fmt.Sprintf("got signal: %s", sig.String()))
-		if err = agent.SendMetrics(runCtx); err != nil {
+		if err = agent.SendMetricsLoop(runCtx); err != nil {
 			r.logger.Errorf("send metrics after signal %q exited with error: %s", sig.String(), err.Error())
 		} else {
 			r.logger.Infof("metrics successfully sent after signal %q", sig.String())

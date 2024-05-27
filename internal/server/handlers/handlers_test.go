@@ -3,7 +3,7 @@ package handlers
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/ZnNr/go-musthave-metrics.git/internal/collector"
+	"github.com/ZnNr/go-musthave-metrics.git/internal/agent/collector"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-resty/resty/v2"
 	"github.com/stretchr/testify/assert"

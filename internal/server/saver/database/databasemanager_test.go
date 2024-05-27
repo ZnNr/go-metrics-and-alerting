@@ -3,7 +3,7 @@ package database
 import (
 	"context"
 	"github.com/DATA-DOG/go-sqlmock"
-	"github.com/ZnNr/go-musthave-metrics.git/internal/collector"
+	"github.com/ZnNr/go-musthave-metrics.git/internal/agent/collector"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )

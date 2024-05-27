@@ -2,7 +2,7 @@ package file
 
 import (
 	"context"
-	"github.com/ZnNr/go-musthave-metrics.git/internal/collector"
+	"github.com/ZnNr/go-musthave-metrics.git/internal/agent/collector"
 	"github.com/stretchr/testify/assert"
 	"os"
 	"testing"

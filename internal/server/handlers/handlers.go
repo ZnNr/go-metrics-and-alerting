@@ -11,11 +11,12 @@ import (
 	"encoding/json"
 	"encoding/pem"
 	"fmt"
-	"github.com/ZnNr/go-musthave-metrics.git/internal/collector"
+	collector2 "github.com/ZnNr/go-musthave-metrics.git/internal/agent/collector"
 	"github.com/go-chi/chi/v5"
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"html/template"
 	"io"
+	"net"
 	"net/http"
 	"os"
 	"strconv"
@@ -29,8 +30,8 @@ func (h *Handler) SaveMetricHandler(w http.ResponseWriter, r *http.Request) {
 	metricName := chi.URLParam(r, "name")
 	metricValue := chi.URLParam(r, "value")
 
-	if err := collector.Collector().Collect(
-		collector.MetricRequest{
+	if err := collector2.Collector().Collect(
+		collector2.MetricRequest{
 			ID:    metricName,
 			MType: metricType,
 		}, metricValue); err != nil {
@@ -67,7 +68,7 @@ func (h *Handler) SaveMetricFromJSONHandler(w http.ResponseWriter, r *http.Reque
 	}
 
 	// unmarshall request body and get metric
-	var metric collector.MetricRequest
+	var metric collector2.MetricRequest
 	if err := json.Unmarshal(message, &metric); err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		return
@@ -97,7 +98,7 @@ func (h *Handler) SaveListMetricsFromJSONHandler(w http.ResponseWriter, r *http.
 	}
 
 	// unmarshall request body and get metric
-	var metrics []collector.MetricRequest
+	var metrics []collector2.MetricRequest
 	if err := json.Unmarshal(buf.Bytes(), &metrics); err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		return
@@ -130,23 +131,23 @@ func (h *Handler) GetMetricFromJSONHandler(w http.ResponseWriter, r *http.Reques
 	}
 
 	// unmarshall body and get requested metric name
-	var metric collector.MetricRequest
+	var metric collector2.MetricRequest
 	if err := json.Unmarshal(buf.Bytes(), &metric); err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
 	// get metric from collector
-	resultJSON, err := collector.Collector().GetMetric(metric.ID)
+	resultJSON, err := collector2.Collector().GetMetric(metric.ID)
 	if err != nil {
 		w.WriteHeader(h.getStatusOnError(err))
 		return
 	}
 	// get metric value
 	switch metric.MType {
-	case collector.Counter:
+	case collector2.Counter:
 		metric.Delta = resultJSON.CounterValue
-	case collector.Gauge:
+	case collector2.Gauge:
 		metric.Value = resultJSON.GaugeValue
 	}
 	answer, err := json.Marshal(metric)
@@ -169,12 +170,12 @@ func (h *Handler) GetMetricHandler(w http.ResponseWriter, r *http.Request) {
 	metricType := chi.URLParam(r, "type")
 	metricName := chi.URLParam(r, "name")
 
-	if metricType != collector.Counter && metricType != collector.Gauge {
+	if metricType != collector2.Counter && metricType != collector2.Gauge {
 		w.WriteHeader(http.StatusNotImplemented)
 		return
 	}
 	// get requested metric from collector
-	value, err := collector.Collector().GetMetric(metricName)
+	value, err := collector2.Collector().GetMetric(metricName)
 	if err != nil {
 		w.WriteHeader(h.getStatusOnError(err))
 		return
@@ -196,11 +197,11 @@ func (h *Handler) ShowMetricsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var page string
-	for _, n := range collector.Collector().GetAvailableMetrics() {
+	for _, n := range collector2.Collector().GetAvailableMetrics() {
 		page += fmt.Sprintf("<h1>	%s</h1>", n)
 	}
 	tmpl, _ := template.New("data").Parse("<h1>AVAILABLE METRICS</h1>{{range .}}<h3>{{ .}}</h3>{{end}}")
-	if err := tmpl.Execute(w, collector.Collector().GetAvailableMetrics()); err != nil {
+	if err := tmpl.Execute(w, collector2.Collector().GetAvailableMetrics()); err != nil {
 		return
 	}
 	w.Header().Set("content-type", "Content-Type: text/html; charset=utf-8")
@@ -249,19 +250,39 @@ func (h *Handler) CheckSubscriptionHandler(hh http.Handler) http.Handler {
 	return http.HandlerFunc(checkFn)
 }
 
+// CheckSubnetHandler возвращает обработчик, который проверяет, принадлежит ли входящий IP-адрес доверенной подсети.
+func (h *Handler) CheckSubnetHandler(hh http.Handler) http.Handler {
+	// Функция checkSubnetFn выполняет проверку подсети перед обработкой запроса.
+	checkSubnetFn := func(w http.ResponseWriter, r *http.Request) {
+		// Проверяем, установлена ли доверенная подсеть.
+		if h.trustedIPNet != nil {
+			realIP := r.Header.Get("X-Real-IP") // Получаем реальный IP-адрес из заголовка запроса.
+			clientIP := net.ParseIP(realIP)
+			// Проверяем, принадлежит ли реальный IP-адрес доверенной подсети.
+			if !h.trustedIPNet.Contains(clientIP) {
+				w.WriteHeader(http.StatusForbidden)
+				return
+			}
+		}
+		hh.ServeHTTP(w, r) // Если IP принадлежит доверенной подсети, передаем управление следующему обработчику.
+	}
+	// Возвращаем обработчик, который будет выполнять проверку доверенной подсети перед вызовом переданного обработчика.
+	return http.HandlerFunc(checkSubnetFn)
+}
+
 // collectMetric - метод для сохранения метрики.
-func (h *Handler) collectMetric(metric collector.MetricRequest) ([]byte, error) {
-	c := collector.Collector()
+func (h *Handler) collectMetric(metric collector2.MetricRequest) ([]byte, error) {
+	c := collector2.Collector()
 
 	// get metric value
 	var metricValue string
 	switch metric.MType {
-	case collector.Counter:
+	case collector2.Counter:
 		metricValue = strconv.Itoa(int(*metric.Delta))
-	case collector.Gauge:
+	case collector2.Gauge:
 		metricValue = strconv.FormatFloat(*metric.Value, 'f', 11, 64)
 	default:
-		return nil, collector.ErrNotImplemented
+		return nil, collector2.ErrNotImplemented
 	}
 
 	// save metric
@@ -293,9 +314,9 @@ func (h *Handler) checkSubscription(w http.ResponseWriter, buf bytes.Buffer, hea
 // getStatusOnError - метод для получения статусного кода на основе ошибки.
 func (h *Handler) getStatusOnError(err error) int {
 	statusCodes := map[error]int{
-		collector.ErrBadRequest:     http.StatusBadRequest,
-		collector.ErrNotImplemented: http.StatusNotImplemented,
-		collector.ErrNotFound:       http.StatusNotFound,
+		collector2.ErrBadRequest:     http.StatusBadRequest,
+		collector2.ErrNotImplemented: http.StatusNotImplemented,
+		collector2.ErrNotFound:       http.StatusNotFound,
 	}
 
 	if statusCode, ok := statusCodes[err]; ok {
@@ -313,10 +334,18 @@ func (h *Handler) getHash(body []byte) string {
 }
 
 // New - функция создания нового экземпляра Handler.
-func New(db string, key string, cryptoKey string) (*Handler, error) {
+func New(db string, key string, cryptoKey string, trustedSubnet string) (*Handler, error) {
 	handler := &Handler{
-		dbAddress: db,
-		key:       key,
+		dbAddress:     db,
+		key:           key,
+		trustedSubnet: trustedSubnet,
+	}
+	if trustedSubnet != "" {
+		_, ipnet, err := net.ParseCIDR(trustedSubnet)
+		if err != nil {
+			return nil, fmt.Errorf("error parsing trusted subnet: %v", err)
+		}
+		handler.trustedIPNet = ipnet
 	}
 	if cryptoKey != "" {
 		b, err := os.ReadFile(cryptoKey)
@@ -336,7 +365,9 @@ func New(db string, key string, cryptoKey string) (*Handler, error) {
 // Handler - структура, представляющая обработчик запросов.
 // Она содержит методы для сохранения метрик, получения метрик, проверки доступности базы данных и другие.
 type Handler struct {
-	dbAddress string
-	key       string
-	cryptoKey *rsa.PrivateKey
+	dbAddress     string
+	trustedSubnet string
+	trustedIPNet  *net.IPNet // Добавьте новое поле для хранения IP-подсети
+	key           string
+	cryptoKey     *rsa.PrivateKey
 }

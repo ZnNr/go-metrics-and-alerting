@@ -1,0 +1,24 @@
+syntax = "proto3";
+
+package scraper;
+
+option go_package = "go-musthave-metrics/proto";
+
+// MetricRequest представляет запрос на сохранение метрики.
+message MetricRequest {
+  string ID = 1;     // Уникальный идентификатор метрики.
+  string MType = 2;  // Тип метрики (Counter или Gauge).
+  int64 Delta = 3;   // Изменение для счетчика.
+  double Value = 4;  // Значение для метрики Gauge.
+}
+
+// SaveMetricResponse представляет ответ на сохранение метрики.
+message SaveMetricResponse {
+  bytes resultJSON = 1;  // Результат сохранения метрики в формате JSON.
+  string error = 2;      // Сообщение об ошибке, если есть.
+}
+
+// Сервис Metrics определяет операцию сохранения метрики из JSON.
+service Metrics {
+  rpc SaveMetricFromJSON(MetricRequest) returns (SaveMetricResponse);
+}

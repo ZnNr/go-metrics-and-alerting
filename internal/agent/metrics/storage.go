@@ -1,7 +1,7 @@
-package storage
+package metrics
 
 import (
-	"github.com/ZnNr/go-musthave-metrics.git/internal/collector"
+	"github.com/ZnNr/go-musthave-metrics.git/internal/agent/collector"
 	"github.com/shirou/gopsutil/v3/cpu"
 	"github.com/shirou/gopsutil/v3/mem"
 	"math/rand"
@@ -64,7 +64,7 @@ func (st *Storage) GopsutilMetricStore() {
 
 }
 
-// New - это конструктор, который создает и возвращает новый экземпляр структуры storage.
+// New - это конструктор, который создает и возвращает новый экземпляр структуры metrics.
 // Он принимает аргумент metricsCollector, который должен быть реализацией интерфейса collectorImpl
 func New(metricsCollector collectorImpl) *Storage {
 	return &Storage{

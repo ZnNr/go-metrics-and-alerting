@@ -13,21 +13,32 @@ import (
 const (
 	defaultRateLimit = 1
 	// Адрес и порт сервера по умолчанию
-	defaultAddr string = "localhost:8080"
+	defaultAddr     = "localhost:8080"
+	defaultGrpcAddr = "127.0.0.1:3200"
 	// Интервал отчетов по умолчанию (в секундах)
-	defaultReportInterval int = 5
+	defaultReportInterval = 5
 	// Интервал опроса по умолчанию (в секундах)
-	defaultPollInterval int = 1
+	defaultPollInterval = 1
 	// Интервал сохранения по умолчанию (в секундах)
-	defaultStoreInterval int = 15
+	defaultStoreInterval = 15
 	// Путь к файлу хранения по умолчанию
-	defaultFileStoragePath string = "/tmp/metrics-db.json"
+	defaultFileStoragePath = "/tmp/metrics-db.json"
 	// Восстанавливать состояние по умолчанию или нет
-	defaultRestore bool = true
+	defaultRestore = true
 )
 
 // Option - функция, которая изменяет поля структуры параметров
 type Option func(params *Params)
+
+// WithTrustedSubnet возвращает опцию для установки доверенной подсети.
+func WithTrustedSubnet() Option {
+	return func(p *Params) {
+		flag.StringVar(&p.TrustedSubnet, "t", p.TrustedSubnet, "trusted subnet")
+		if envTrustedSubnet := os.Getenv("TRUSTED_SUBNET"); envTrustedSubnet != "" {
+			p.TrustedSubnet = envTrustedSubnet
+		}
+	}
+}
 
 // WithRateLimit создает опцию для установки ограничения запросов.
 func WithRateLimit() Option {
@@ -146,6 +157,34 @@ func WithTLSKeyPath() Option {
 	}
 }
 
+// WithGrpcAddr возвращает опцию для установки адреса сервера gRPC.
+// Функция позволяет установить адрес, по которому будет запущен сервер gRPC.
+func WithGrpcAddr() Option {
+	return func(p *Params) {
+		flag.StringVar(&p.GrpcRunAddr, "ga", p.GrpcRunAddr, "address and port to run gRPC server")
+		// Устанавливаем флаг для адреса сервера gRPC, используя значение по умолчанию, если флаг не установлен.
+		// Пользователь может указать переменную окружения GRPC_ADDRESS для установки адреса.
+		if envRunAddr := os.Getenv("GRPC_ADDRESS"); envRunAddr != "" {
+			p.GrpcRunAddr = envRunAddr
+		}
+	}
+}
+
+// WithGrpc возвращает опцию для отключения сервера gRPC.
+// Функция позволяет управлять включением/отключением сервера gRPC.
+func WithGrpc() Option {
+	return func(p *Params) {
+		// Устанавливаем флаг для отключения сервера gRPC, используя значение по умолчанию, если флаг не установлен.
+		// Пользователь может указать переменную окружения DISABLE_GRPC для управления флагом отключения.
+		flag.BoolVar(&p.DisableGrpc, "disable-grpc", p.DisableGrpc, "turn off grpc")
+		if disableGrpc := os.Getenv("DISABLE_GRPC"); disableGrpc != "" {
+			if v, err := strconv.ParseBool(disableGrpc); err != nil {
+				p.DisableGrpc = v
+			}
+		}
+	}
+}
+
 func WithConfig() Option {
 	return func(p *Params) {
 		var configPath string
@@ -183,6 +222,8 @@ func Init(opts ...Option) *Params {
 		StoreInterval:   defaultStoreInterval,
 		FileStoragePath: defaultFileStoragePath,
 		Restore:         defaultRestore,
+		GrpcRunAddr:     defaultGrpcAddr,
+		DisableGrpc:     true,
 	}
 
 	for _, opt := range opts {
@@ -193,14 +234,17 @@ func Init(opts ...Option) *Params {
 }
 
 type Params struct {
-	FlagRunAddr     string `json:"address"`         // Адрес и порт сервера
 	DatabaseAddress string `json:"database_dsn"`    // Адрес базы данных
 	ReportInterval  int    `json:"report_interval"` // Интервал отчетов
 	PollInterval    int    `json:"poll_interval"`   // Интервал опроса
 	StoreInterval   int    `json:"store_interval"`  // Интервал сохранения
 	FileStoragePath string `json:"store_file"`      // Путь к хранилищу файлов
 	Restore         bool   `json:"restore"`         // Флаг восстановления данных
+	FlagRunAddr     string `json:"address"`         // Адрес и порт сервера
+	TrustedSubnet   string `json:"trusted_subnet"`  // доверенная подсеть
 	Key             string `json:"hash_key"`        // Ключ подписки
 	RateLimit       int    `json:"rate_limit"`      // Ограничение запросов
 	CryptoKeyPath   string `json:"crypto_key"`      // Путь к криптографическому ключу
+	GrpcRunAddr     string `json:"grpc_address"`    // Адрес и порт для запуска сервера grpc
+	DisableGrpc     bool   `json:"disable_grpc"`    // Отключить сервер grpc
 }
